@@ -3,43 +3,181 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>登录 · 教学文档协作平台</title>
-    <link rel="stylesheet" href="styles.css" />
+    <title>原型入口 · 教学文档协作平台</title>
+    <style>
+      :root {
+        --brand: #2f5f9e;
+        --brand-dark: #1f4473;
+        --border: #e3e8ef;
+        --muted: #6b7280;
+        --bg: #f5f7fa;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
+        background: var(--bg);
+        color: #1f2937;
+      }
+
+      .topbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 14px 24px;
+        background: #fff;
+        border-bottom: 1px solid var(--border);
+      }
+
+      .brand {
+        font-size: 18px;
+        font-weight: 700;
+        color: var(--brand);
+      }
+
+      .container {
+        max-width: 980px;
+        margin: 0 auto;
+        padding: 32px 24px 48px;
+      }
+
+      h1 {
+        font-size: 24px;
+        margin: 0 0 8px;
+      }
+
+      .subtitle {
+        color: var(--muted);
+        margin: 0 0 28px;
+        line-height: 1.7;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 20px;
+      }
+
+      .card {
+        display: block;
+        background: #fff;
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 20px;
+        text-decoration: none;
+        color: inherit;
+        transition: box-shadow 0.2s, transform 0.2s;
+      }
+
+      .card:hover {
+        box-shadow: 0 6px 18px rgba(47, 95, 158, 0.12);
+        transform: translateY(-2px);
+      }
+
+      .card h2 {
+        font-size: 18px;
+        margin: 0 0 10px;
+        color: var(--brand-dark);
+      }
+
+      .card p {
+        margin: 0 0 12px;
+        color: var(--muted);
+        line-height: 1.7;
+      }
+
+      .tag {
+        display: inline-block;
+        font-size: 12px;
+        padding: 2px 8px;
+        border-radius: 999px;
+        margin-bottom: 12px;
+      }
+
+      .tag-live {
+        background: #e6f0fb;
+        color: var(--brand-dark);
+      }
+
+      .tag-static {
+        background: #fdf0e3;
+        color: #92500e;
+      }
+
+      .list {
+        margin: 0;
+        padding-left: 18px;
+        color: #374151;
+        line-height: 1.8;
+        font-size: 14px;
+      }
+
+      .note {
+        margin-top: 28px;
+        background: #fff;
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 18px 20px;
+        color: var(--muted);
+        line-height: 1.8;
+        font-size: 14px;
+      }
+
+      .note code {
+        background: var(--bg);
+        padding: 1px 6px;
+        border-radius: 4px;
+        color: var(--brand-dark);
+      }
+    </style>
   </head>
-  <body data-page="login">
+  <body>
     <header class="topbar">
-      <a class="brand" href="index.html">教学文档协作平台</a>
-      <div id="topbar"></div>
+      <span class="brand">教学文档协作平台</span>
+      <span style="color: var(--muted); font-size: 14px">业务方向 · 原型入口</span>
     </header>
-    <main class="container login-wrap">
-      <h1>欢迎登录</h1>
-      <p class="subtitle">文档管理模块原型</p>
-      <div class="card">
-        <form id="loginForm" class="form-grid">
-          <div>
-            <label for="username">工号</label>
-            <input id="username" name="username" value="admin" required />
-          </div>
-          <div>
-            <label for="name">姓名</label>
-            <input id="name" name="name" value="管理员" required />
-          </div>
-          <div>
-            <label for="password">初始密码</label>
-            <input id="password" name="password" type="password" value="123456" required />
-          </div>
-          <div>
-            <label for="role">角色</label>
-            <select id="role" name="role">
-              <option value="admin">管理员</option>
-              <option value="teacher">教师</option>
-            </select>
-          </div>
-          <button class="btn btn-primary" type="submit">登录</button>
-        </form>
+
+    <main class="container">
+      <h1>原型入口</h1>
+      <p class="subtitle">
+        当前并列放置两个业务原型。它们解决的问题不同：一个是文档管理模块的正式原型，另一个是任务看板的独立原型。
+      </p>
+
+      <div class="grid">
+        <a class="card" href="documents/index.html">
+          <span class="tag tag-live">已接入 Flask API</span>
+          <h2>文档管理原型（documents）</h2>
+          <p>文档分类、文档列表、文档详情、上传新版本、历史版本、下载确认。</p>
+          <ul class="list">
+            <li>7 个页面，登录后才能访问</li>
+            <li>数据来自真实后端，需要先启动 <code>backend/run.py</code></li>
+            <li>演示账号：admin / admin123（管理员）</li>
+            <li>teacher / teacher123（负责人）、viewer / viewer123（普通教师）</li>
+          </ul>
+        </a>
+
+        <a class="card" href="taskman/index.html">
+          <span class="tag tag-static">纯静态原型 · 无后端</span>
+          <h2>任务看板原型（taskman）</h2>
+          <p>任务优先级自动排序、手动拖拽排序、权重设置、任务详情与状态推进。</p>
+          <ul class="list">
+            <li>4 个页面，数据存在浏览器 localStorage</li>
+            <li>不需要后端，可单独演示；首次打开会自动载入示例数据</li>
+            <li>界面样式来自 Bootstrap CDN，离线时布局会退化</li>
+            <li>当前是独立原型，尚未纳入文档管理模块的需求范围</li>
+          </ul>
+        </a>
+      </div>
+
+      <div class="note">
+        访问方式：先运行 <code>.\\.venv\\Scripts\\python.exe backend\\run.py</code>，再打开
+        <code>http://127.0.0.1:5000/</code> 回到本入口页。任务看板原型也可以直接双击
+        <code>prototype/taskman/index.html</code> 打开，不需要后端。
       </div>
     </main>
-    <script src="mock-data.js"></script>
-    <script src="app.js"></script>
   </body>
 </html>

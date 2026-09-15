@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>编辑任务</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+  <nav class="navbar navbar-dark bg-primary">
+    <div class="container">
+      <a class="navbar-brand" href="index.html">📋 教学文档协作平台</a>
+      <div class="navbar-nav ms-auto">
+        <a class="nav-link" href="../index.html">← 原型入口</a>
+        <a class="nav-link" href="index.html">返回看板</a>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container mt-4" style="max-width:700px;">
+    <h4 id="pageTitle">新建任务</h4>
+    <form id="taskForm">
+      <input type="hidden" id="taskId">
+
+      <div class="mb-3">
+        <label class="form-label">任务名称 *</label>
+        <input type="text" class="form-control" id="title" required>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">任务描述</label>
+        <textarea class="form-control" id="description" rows="2"></textarea>
+      </div>
+
+      <div class="row">
+        <div class="col-md-6 mb-3">
+          <label class="form-label">截止日期</label>
+          <input type="date" class="form-control" id="deadline">
+        </div>
+        <div class="col-md-6 mb-3">
+          <label class="form-label">日期类型</label>
+          <select class="form-select" id="deadline_type">
+            <option value="flexible">弹性（可协商）</option>
+            <option value="hard">硬性（不可延期）</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="col-md-6 mb-3">
+          <label class="form-label">难度（1-5）</label>
+          <input type="range" class="form-range" id="difficulty" min="1" max="5" value="3">
+          <span id="difficultyVal">3</span>
+        </div>
+        <div class="col-md-6 mb-3">
+          <label class="form-label">工作量（1-5）</label>
+          <input type="range" class="form-range" id="workload" min="1" max="5" value="3">
+          <span id="workloadVal">3</span>
+        </div>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">所需条件</label>
+        <input type="text" class="form-control" id="condition_note" placeholder="如：等待教务处下发模板">
+      </div>
+
+      <div class="mb-3 form-check">
+        <input type="checkbox" class="form-check-input" id="is_blocked">
+        <label class="form-check-label" for="is_blocked">当前阻塞（条件未满足）</label>
+      </div>
+
+      <div class="row">
+        <div class="col-md-6 mb-3">
+          <label class="form-label">任务状态</label>
+          <select class="form-select" id="status">
+            <option value="pending">未开始</option>
+            <option value="in_progress">进行中</option>
+            <option value="reviewing">待审核</option>
+            <option value="completed">已完成</option>
+            <option value="archived">已归档</option>
+          </select>
+        </div>
+        <div class="col-md-6 mb-3">
+          <label class="form-label">文档状态标识</label>
+          <select class="form-select" id="doc_status">
+            <option value="">（无）</option>
+            <option value="draft">草稿</option>
+            <option value="revising">修订中</option>
+            <option value="finalized">已定稿</option>
+          </select>
+        </div>
+      </div>
+
+      <button type="submit" class="btn btn-primary">保存</button>
+      <a href="index.html" class="btn btn-secondary">取消</a>
+    </form>
+  </div>
+
+  <script src="js/storage.js"></script>
+  <script src="js/seed.js"></script>
+  <script src="js/edit.js"></script>
+</body>
+</html>
