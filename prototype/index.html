@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>登录 · 教学文档协作平台</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body data-page="login">
+    <header class="topbar">
+      <a class="brand" href="index.html">教学文档协作平台</a>
+      <div id="topbar"></div>
+    </header>
+    <main class="container login-wrap">
+      <h1>欢迎登录</h1>
+      <p class="subtitle">文档管理模块原型</p>
+      <div class="card">
+        <form id="loginForm" class="form-grid">
+          <div>
+            <label for="username">工号</label>
+            <input id="username" name="username" value="admin" required />
+          </div>
+          <div>
+            <label for="name">姓名</label>
+            <input id="name" name="name" value="管理员" required />
+          </div>
+          <div>
+            <label for="password">初始密码</label>
+            <input id="password" name="password" type="password" value="123456" required />
+          </div>
+          <div>
+            <label for="role">角色</label>
+            <select id="role" name="role">
+              <option value="admin">管理员</option>
+              <option value="teacher">教师</option>
+            </select>
+          </div>
+          <button class="btn btn-primary" type="submit">登录</button>
+        </form>
+      </div>
+    </main>
+    <script src="mock-data.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>

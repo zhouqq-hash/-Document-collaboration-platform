@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>上传新版本 · 教学文档协作平台</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body data-page="upload">
+    <header class="topbar">
+      <a class="brand" href="categories.html">教学文档协作平台</a>
+      <div id="topbar"></div>
+    </header>
+    <main class="container">
+      <h1 class="page-title">上传新版本</h1>
+      <p class="page-subtitle">文档：<span id="docTitle"></span></p>
+      <div id="upload" class="card">
+        <form id="uploadForm" class="form-grid">
+          <div>
+            <label for="file">选择文件</label>
+            <input id="file" type="file" required />
+          </div>
+          <div>
+            <label for="changelog">变更说明</label>
+            <textarea id="changelog" rows="4" placeholder="说明本次修改内容"></textarea>
+          </div>
+          <div class="actions">
+            <button class="btn btn-primary" type="submit">上传并生成新版本</button>
+            <a class="btn btn-outline" href="document-detail.html" id="backLink">返回详情</a>
+          </div>
+        </form>
+      </div>
+    </main>
+    <script src="mock-data.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>

@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>文档列表 · 教学文档协作平台</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body data-page="documents">
+    <header class="topbar">
+      <a class="brand" href="categories.html">教学文档协作平台</a>
+      <div id="topbar"></div>
+    </header>
+    <main class="container">
+      <h1 class="page-title">文档列表</h1>
+      <p class="page-subtitle">查看文档的负责人、版本和更新时间。</p>
+      <div class="toolbar">
+        <select id="categoryFilter" class="form-control"></select>
+      </div>
+      <table class="table">
+        <thead>
+          <tr>
+            <th>标题</th>
+            <th>分类</th>
+            <th>负责人</th>
+            <th>当前版本</th>
+            <th>最近更新</th>
+          </tr>
+        </thead>
+        <tbody id="documentList"></tbody>
+      </table>
+    </main>
+    <script src="mock-data.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>

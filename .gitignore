@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+backend/.pytest_tmp/
+backend/instance/
+backend/media/*
+!backend/media/.gitkeep
+*.db
+.idea/
+.vscode/
