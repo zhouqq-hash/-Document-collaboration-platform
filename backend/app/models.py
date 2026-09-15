@@ -82,6 +82,7 @@ class Document(db.Model):
         order_by="DocumentVersion.version_number.desc()",
     )
     description = db.Column(db.String(500), default="")
+    
     #获取最新版本
     @property
     def current_version(self):
