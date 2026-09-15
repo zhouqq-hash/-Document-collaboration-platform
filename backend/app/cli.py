@@ -24,6 +24,12 @@ def register_commands(app):
             teacher.password_hash = generate_password_hash("teacher123")
             db.session.add(teacher)
 
+        viewer = User.query.filter_by(username="viewer").first()
+        if viewer is None:
+            viewer = User(username="viewer", name="王老师", role="teacher")
+            viewer.password_hash = generate_password_hash("viewer123")
+            db.session.add(viewer)
+
         db.session.flush()
 
         category_names = [
@@ -74,4 +80,4 @@ def register_commands(app):
 
         db.session.commit()
         print("Seed completed.")
-        print("Accounts: admin/admin123, teacher/teacher123")
+        print("Accounts: admin/admin123, teacher/teacher123, viewer/viewer123")
