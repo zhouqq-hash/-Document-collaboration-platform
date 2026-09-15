@@ -30,7 +30,7 @@
 请求：
 
 ```json
-{ "username": "admin", "password": "123456" }
+{ "username": "admin", "password": "admin123" }
 ```
 
 响应：
@@ -79,7 +79,7 @@
 仅管理员，创建文档并上传首个版本。使用 multipart：
 
 ```text
-title, category_id, owner_id, changelog, file
+title, category_id, owner_id, description, changelog, file
 ```
 
 ### GET /api/documents/{id}
