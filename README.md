@@ -7,12 +7,54 @@
 - `docs/`：需求、原型验收、架构、接口规范、Django 对照学习笔记和工作日志（`worklog-*.md`）。
 - `prototype/`：业务方向原型的入口页，下面并列 `documents/`（文档管理模块原型，已接入 Flask API）和 `taskman/`（任务看板原型，纯前端）。
 - `backend/`：Flask 后端实现。
+- `djangotutorial/`：Django 官方教程的练习项目，属于对照学习资料，不是本项目成果，分享给别人时注意区分。
 
 后端单独运行时，优先查看 `backend/README.md`。
 
 项目分工与技术路线见 `docs/project-division.md`：当前个人角色为技术后端，Flask 为首选实现框架，Django 仅做对照学习。
 
 文档管理模块的业务走查见 `docs/business-walkthrough.md`。
+
+## Python 环境说明
+
+仓库里有两个互相独立的虚拟环境，用途不同，不要混用：
+
+| 环境 | 用途 | 主要依赖 | 对应代码 |
+| --- | --- | --- | --- |
+| `.venv` | 本项目后端 | Flask、Flask-SQLAlchemy、Flask-Migrate、Flask-Login、pytest | `backend/` |
+| `.django-learning` | Django 对照学习 | Django | `djangotutorial/` |
+
+两个环境的 `include-system-site-packages` 都是 `false`，彼此看不到对方的包，也不会继承 Anaconda base 里的包。
+
+进入 Flask 环境（跑本项目的后端）：
+
+```powershell
+& .\.venv\Scripts\Activate.ps1
+```
+
+进入 Django 环境（学 Django 教程）：
+
+```powershell
+& .\.django-learning\Scripts\Activate.ps1
+```
+
+也可以不激活，直接用全路径调用对应环境的解释器，效果一样：
+
+```powershell
+.\.django-learning\Scripts\python.exe .\djangotutorial\manage.py runserver
+```
+
+三条规矩：
+
+- 一个终端只激活一个环境，切换前先执行 `deactivate`。
+- 装包统一用 `python -m pip install ...`，不要用裸 `pip`，免得装进另一个环境。
+- 提示符前缀就是当前环境名，`(.venv)` 是 Flask，`(.django-learning)` 是 Django。
+
+如果提示「在此系统上禁止运行脚本」，先执行一次：
+
+```powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned
+```
 
 ## 本地运行后端
 

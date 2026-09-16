@@ -32,6 +32,8 @@ python -m flask --app run.py seed
 python run.py
 ```
 
+上面这段是按「只拿到 `backend/` 目录」的场景写的，`.venv` 会建在 `backend/` 下。在完整仓库里，Flask 环境是仓库根目录的 `.venv`，Django 对照学习用的是另一个环境 `.django-learning`，对应 `djangotutorial/`，两者互不相通，别把 Django 装进 `.venv`。详见根目录 `README.md` 的「Python 环境说明」。
+
 启动后访问：
 
 ```text

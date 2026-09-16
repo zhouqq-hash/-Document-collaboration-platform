@@ -8,5 +8,7 @@ backend/instance/
 backend/media/*
 !backend/media/.gitkeep
 *.db
+*.sqlite3
+*.sqlite3-journal
 .idea/
 .vscode/
