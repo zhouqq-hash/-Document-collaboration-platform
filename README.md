@@ -5,7 +5,7 @@
 ## 目录
 
 - `docs/`：需求、原型验收、架构、接口规范、Flask 文档管理模块笔记（`flask-notes.md`）、Django 对照学习笔记和工作日志（`worklog-*.md`）。
-- `prototype/`：业务方向原型的入口页，下面并列 `documents/`（文档管理模块原型，已接入 Flask API）和 `taskman/`（任务看板原型，纯前端）。
+- `prototype/`：业务方向原型的入口页，下面存放 `documents/`（文档管理模块原型，已接入 Flask API，入口页只展示它）和 `taskman/`（任务看板原型，已从入口页撤下、文件暂留）。
 - `backend/`：Flask 后端实现。
 - `djangotutorial/`：Django 官方教程的练习项目，属于对照学习资料，不是本项目成果，分享给别人时注意区分。
 
@@ -73,12 +73,11 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned
 
 ## 查看原型
 
-`http://127.0.0.1:5000/` 是原型入口页，里面并列两个原型：
+`http://127.0.0.1:5000/` 是原型入口页，当前只展示文档管理模块原型：
 
 | 原型 | 入口 | 说明 |
 | --- | --- | --- |
 | 文档管理模块原型 | `http://127.0.0.1:5000/documents/index.html` | 已接入真实 API，必须先启动后端 |
-| 任务看板原型 | `http://127.0.0.1:5000/taskman/index.html` | 纯前端，数据在浏览器 localStorage，不依赖后端 |
 
 先启动后端：
 
@@ -86,7 +85,7 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned
 .\.venv\Scripts\python.exe backend\run.py
 ```
 
-再打开 `http://127.0.0.1:5000/`，从入口页进入。文档管理原型的页面不能直接双击打开，因为 `file://` 方式无法调用 Flask API；任务看板原型可以直接双击 `prototype\taskman\index.html` 打开。
+再打开 `http://127.0.0.1:5000/`，从入口页进入。文档管理原型的页面不能直接双击打开，因为 `file://` 方式无法调用 Flask API。
 
 ## 常见问题
 

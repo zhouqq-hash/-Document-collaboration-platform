@@ -4,7 +4,7 @@
 
 采用前后端分离：
 
-- 前端：静态 HTML/CSS/JS，位于 `prototype/`。入口是 `prototype/index.html`，下面并列 `documents/`（文档管理模块原型，已接入真实 JSON API）和 `taskman/`（任务看板原型，纯前端，不接后端）。
+- 前端：静态 HTML/CSS/JS，位于 `prototype/`。入口是 `prototype/index.html`，当前只展示 `documents/`（文档管理模块原型，已接入真实 JSON API）。
 - 后端：Flask JSON API，位于 `backend/`，负责认证、权限、数据持久化和文件存储。
 
 ```text
@@ -57,7 +57,7 @@ prototype/
     app.js
     styles.css
     mock-data.js
-  taskman/                 # 任务看板原型（独立原型，不属于本模块）
+  taskman/                 # 任务看板原型（独立原型，已从入口页撤下，文件暂留）
     index.html
     edit.html
     detail.html

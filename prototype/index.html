@@ -58,7 +58,7 @@
 
       .grid {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        grid-template-columns: minmax(0, 620px);
         gap: 20px;
       }
 
@@ -144,7 +144,7 @@
     <main class="container">
       <h1>原型入口</h1>
       <p class="subtitle">
-        当前并列放置两个业务原型。它们解决的问题不同：一个是文档管理模块的正式原型，另一个是任务看板的独立原型。
+        当前演示文档管理模块原型：已经接入真实 Flask API，登录后可以查看分类、文档和历史版本，并上传、下载文件。
       </p>
 
       <div class="grid">
@@ -159,24 +159,11 @@
             <li>teacher / teacher123（负责人）、viewer / viewer123（普通教师）</li>
           </ul>
         </a>
-
-        <a class="card" href="taskman/index.html">
-          <span class="tag tag-static">纯静态原型 · 无后端</span>
-          <h2>任务看板原型（taskman）</h2>
-          <p>任务优先级自动排序、手动拖拽排序、权重设置、任务详情与状态推进。</p>
-          <ul class="list">
-            <li>4 个页面，数据存在浏览器 localStorage</li>
-            <li>不需要后端，可单独演示；首次打开会自动载入示例数据</li>
-            <li>界面样式来自 Bootstrap CDN，离线时布局会退化</li>
-            <li>当前是独立原型，尚未纳入文档管理模块的需求范围</li>
-          </ul>
-        </a>
       </div>
 
       <div class="note">
         访问方式：先运行 <code>.\\.venv\\Scripts\\python.exe backend\\run.py</code>，再打开
-        <code>http://127.0.0.1:5000/</code> 回到本入口页。任务看板原型也可以直接双击
-        <code>prototype/taskman/index.html</code> 打开，不需要后端。
+        <code>http://127.0.0.1:5000/</code> 回到本入口页，然后从上面的卡片进入文档管理原型。
       </div>
     </main>
   </body>
