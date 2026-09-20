@@ -242,34 +242,35 @@ async function initDocumentDetail() {
   const container = document.getElementById("detail");
 
   try {
-    const document = await apiRequest(`/api/documents/${documentId}`);
-    const current = document.current_version;
+    // 注意：不要把这个变量命名为 document，否则会遮蔽浏览器的全局 document
+    const doc = await apiRequest(`/api/documents/${documentId}`);
+    const current = doc.current_version;
     const canUpload =
-      user.role === "admin" || user.id === document.owner.id;
+      user.role === "admin" || user.id === doc.owner.id;
 
-    document.getElementById("pageTitle").textContent = document.title;
+    document.getElementById("pageTitle").textContent = doc.title;
     container.innerHTML = `
       <div class="card">
         <dl class="detail-list">
-          <dt>文档标题</dt><dd>${escapeHtml(document.title)}</dd>
-          <dt>所属分类</dt><dd>${escapeHtml(document.category.name)}</dd>
-          <dt>负责人</dt><dd>${escapeHtml(document.owner.name)}</dd>
+          <dt>文档标题</dt><dd>${escapeHtml(doc.title)}</dd>
+          <dt>所属分类</dt><dd>${escapeHtml(doc.category.name)}</dd>
+          <dt>负责人</dt><dd>${escapeHtml(doc.owner.name)}</dd>
           <dt>当前版本</dt><dd>v${current ? current.version_number : 0}</dd>
-          <dt>最近更新</dt><dd>${formatTime(document.updated_at)}</dd>
-          <dt>说明</dt><dd>${escapeHtml(document.description || "-")}</dd>
+          <dt>最近更新</dt><dd>${formatTime(doc.updated_at)}</dd>
+          <dt>说明</dt><dd>${escapeHtml(doc.description || "-")}</dd>
         </dl>
         <div class="actions">
           ${
             current
-              ? `<a class="btn btn-primary" href="download.html?id=${document.id}&version_id=${current.id}">下载当前版本</a>`
+              ? `<a class="btn btn-primary" href="download.html?id=${doc.id}&version_id=${current.id}">下载当前版本</a>`
               : ""
           }
           ${
             canUpload
-              ? `<a class="btn btn-outline" href="upload-version.html?id=${document.id}">上传新版本</a>`
+              ? `<a class="btn btn-outline" href="upload-version.html?id=${doc.id}">上传新版本</a>`
               : '<span class="notice" style="margin:0">你当前为只读权限，不能上传新版本</span>'
           }
-          <a class="btn btn-outline" href="versions.html?id=${document.id}">查看历史版本</a>
+          <a class="btn btn-outline" href="versions.html?id=${doc.id}">查看历史版本</a>
         </div>
       </div>
     `;
@@ -285,9 +286,9 @@ async function initUpload() {
   const backLink = document.getElementById("backLink");
 
   try {
-    const document = await apiRequest(`/api/documents/${documentId}`);
-    document.getElementById("docTitle").textContent = document.title;
-    backLink.href = `document-detail.html?id=${document.id}`;
+    const doc = await apiRequest(`/api/documents/${documentId}`);
+    document.getElementById("docTitle").textContent = doc.title;
+    backLink.href = `document-detail.html?id=${doc.id}`;
   } catch (error) {
     showPageMessage("upload", error.message, true);
     return;
@@ -332,11 +333,11 @@ async function initVersions() {
   const container = document.getElementById("versions");
 
   try {
-    const document = await apiRequest(`/api/documents/${documentId}`);
+    const doc = await apiRequest(`/api/documents/${documentId}`);
     const versions = await apiRequest(
       `/api/documents/${documentId}/versions`
     );
-    document.getElementById("docTitle").textContent = document.title;
+    document.getElementById("docTitle").textContent = doc.title;
     container.innerHTML = versions.length
       ? versions
           .map(
@@ -344,7 +345,7 @@ async function initVersions() {
               <div class="card">
                 <div class="toolbar">
                   <strong>v${version.version_number}</strong>
-                  <a class="btn btn-outline" href="download.html?id=${document.id}&version_id=${version.id}">下载</a>
+                  <a class="btn btn-outline" href="download.html?id=${doc.id}&version_id=${version.id}">下载</a>
                 </div>
                 <dl class="detail-list">
                   <dt>文件名</dt><dd>${escapeHtml(version.filename)}</dd>
@@ -369,7 +370,7 @@ async function initDownload() {
   const container = document.getElementById("download");
 
   try {
-    const document = await apiRequest(`/api/documents/${documentId}`);
+    const doc = await apiRequest(`/api/documents/${documentId}`);
     const versions = await apiRequest(
       `/api/documents/${documentId}/versions`
     );
@@ -383,19 +384,19 @@ async function initDownload() {
     container.innerHTML = `
       <div class="card">
         <dl class="detail-list">
-          <dt>文档标题</dt><dd>${escapeHtml(document.title)}</dd>
+          <dt>文档标题</dt><dd>${escapeHtml(doc.title)}</dd>
           <dt>文件名</dt><dd>${escapeHtml(version.filename)}</dd>
           <dt>版本号</dt><dd>v${version.version_number}</dd>
           <dt>上传人</dt><dd>${escapeHtml(version.uploader.name)}</dd>
         </dl>
         <div class="actions">
           <button class="btn btn-primary" id="confirmDownload" type="button">确认下载</button>
-          <a class="btn btn-outline" href="document-detail.html?id=${document.id}">返回详情</a>
+          <a class="btn btn-outline" href="document-detail.html?id=${doc.id}">返回详情</a>
         </div>
       </div>
     `;
     document.getElementById("confirmDownload").addEventListener("click", () => {
-      window.location.href = `/api/documents/${document.id}/versions/${version.id}/download`;
+      window.location.href = `/api/documents/${doc.id}/versions/${version.id}/download`;
     });
   } catch (error) {
     showPageMessage("download", error.message, true);
