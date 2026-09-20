@@ -4,7 +4,7 @@
 
 ## 目录
 
-- `docs/`：需求、原型验收、架构、接口规范、Django 对照学习笔记和工作日志（`worklog-*.md`）。
+- `docs/`：需求、原型验收、架构、接口规范、Flask 文档管理模块笔记（`flask-notes.md`）、Django 对照学习笔记和工作日志（`worklog-*.md`）。
 - `prototype/`：业务方向原型的入口页，下面并列 `documents/`（文档管理模块原型，已接入 Flask API）和 `taskman/`（任务看板原型，纯前端）。
 - `backend/`：Flask 后端实现。
 - `djangotutorial/`：Django 官方教程的练习项目，属于对照学习资料，不是本项目成果，分享给别人时注意区分。
