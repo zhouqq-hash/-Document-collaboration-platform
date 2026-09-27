@@ -607,7 +607,7 @@ function initWechatCallback() {
         </p>
         <p class="muted">
           后端终端里搜 <code>wechat:</code> 能看到这次登录每一步发生了什么，
-          也可以执行 <code>flask --app backend\run.py wechat-log</code> 回看。
+          也可以执行 <code>flask --app backend\\run.py wechat-log</code> 回看。
         </p>
       `
       : '<p class="muted">微信登录成功，正在返回…</p>';
