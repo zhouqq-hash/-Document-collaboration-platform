@@ -23,7 +23,7 @@ Browser
 | Web 框架 | Flask 3 |
 | ORM | Flask-SQLAlchemy |
 | 数据库迁移 | Flask-Migrate / Alembic |
-| 认证 | Flask-Login + Session |
+| 认证 | Flask-Login + Session，支持工号密码和微信扫码两种登录方式 |
 | 数据库 | SQLite（开发） |
 | 文件存储 | 本地 `backend/media/` |
 | 前端 | 原生 HTML/CSS/JS + Bootstrap 5 |
@@ -38,6 +38,7 @@ backend/
     config.py
     models.py
     auth.py
+    wechat.py
     documents.py
     cli.py
   tests/
@@ -53,7 +54,9 @@ prototype/
     document-detail.html
     upload-version.html
     versions.html
+    account.html
     download.html
+    wechat-callback.html
     app.js
     styles.css
     mock-data.js
@@ -70,7 +73,7 @@ media/
 
 ## 4. 数据模型
 
-- `User`：id、username、name、password_hash、role。
+- `User`：id、username、name、password_hash（微信用可为空）、role、wechat_openid、wechat_unionid、avatar_url。
 - `DocumentCategory`：id、name、sort_order。
 - `Document`：id、title、category_id、owner_id。
 - `DocumentVersion`：id、document_id、version_number、filename、file_path、changelog、uploader_id、created_at。
@@ -84,14 +87,28 @@ media/
 - 文档负责人：可上传新版本。
 - 管理员：可管理分类、创建文档、上传任意文档新版本。
 
-## 6. 文件存储
+## 6. 认证方式
 
-- 开发环境保存在 `backend/media/`。
+- 工号密码：`POST /api/auth/login`，密码用 werkzeug 哈希存储，登录态交给 Flask-Login 的 session。
+- 微信扫码：`backend/app/wechat.py`（前缀 `/api/auth/wechat`），支持开放平台扫码（`open`）和公众号网页授权（`mp`）。
+
+微信登录有两种模式：配好 `WECHAT_APP_ID` / `WECHAT_APP_SECRET` 走真实微信 OAuth（`live`）；没配时默认进入演示模式（`mock`），用本地模拟登录跑通页面和测试，离线也能演示。
+
+扫码链路：前端取授权地址 → 微信回调 `/api/auth/wechat/callback` → 服务端校验 `state`、用 code 换 openid → 按 openid 登录 / 建号 / 绑定 → 跳回结果页，原页面轮询 `/api/auth/me` 后进入系统。微信自动创建的账号没有密码（`password_hash` 为空），可以绑定到已有工号上共享原来的权限和文档。
+
+配置步骤、错误码和排错清单见 `docs/wechat-login-guide.md`。
+
+## 7. 文件存储
+
+- 存储层已抽象为「本地 / COS」可切换，默认使用本地 `backend/media/`。
+- 通过环境变量 `STORAGE_BACKEND=cos` 切换到腾讯云 COS（见 `docs/cos-storage-guide.md`）。
 - 文件命名使用“文档 id + 版本号 + 时间戳 + 原始扩展名”，避免重名。
-- 数据库保存相对路径，下载接口通过 `send_from_directory` 返回文件。
+- 数据库保存的 `file_path` 在本地模式下是文件名、在 COS 模式下是对象 Key，
+  下载接口通过存储层的 `read()` 统一返回文件内容。
 
-## 7. 后续演进
+## 8. 后续演进
 
 - 生产环境切换 PostgreSQL。
-- 文件存储迁移到腾讯云 COS。
+- 文件存储已支持切换到腾讯云 COS，生产环境按需启用。
+- 微信登录已支持真实模式和演示模式，生产环境配好 `WECHAT_*` 并关闭演示开关即可。
 - 使用 Gunicorn + Nginx 部署。

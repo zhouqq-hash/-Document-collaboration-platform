@@ -4,7 +4,7 @@
 
 ## 目录
 
-- `docs/`：需求、原型验收、架构、接口规范、Flask 文档管理模块笔记（`flask-notes.md`）、Django 对照学习笔记和工作日志（`worklog-*.md`）。
+- `docs/`：全部文档的索引和分组见 `docs/README.md`（需求、架构、接口规范、原型验收、微信登录手册与流程、部署、Django 对照学习、工作日志）。
 - `prototype/`：业务方向原型的入口页，下面存放 `documents/`（文档管理模块原型，已接入 Flask API，入口页只展示它）和 `taskman/`（任务看板原型，已从入口页撤下、文件暂留）。
 - `backend/`：Flask 后端实现。
 - `djangotutorial/`：Django 官方教程的练习项目，属于对照学习资料，不是本项目成果，分享给别人时注意区分。
@@ -71,6 +71,16 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned
 - 文档负责人：`teacher / teacher123`
 - 普通教师：`viewer / viewer123`
 
+## 微信登录
+
+登录页支持微信扫码登录，默认是「演示模式」，不用申请微信应用也能演示：
+
+- 演示模式（默认）：后端没配 `WECHAT_APP_ID`，点「模拟微信扫码登录」直接登录；设 `$env:WECHAT_MOCK_ENABLED = "0"` 可以关掉。
+- 真实模式：配好 `WECHAT_APP_ID` / `WECHAT_APP_SECRET` / `WECHAT_REDIRECT_URI` 后自动切换，走微信开放平台扫码或公众号网页授权。
+- 绑定已有工号：登录后进右上角「账号设置」→「绑定微信」，绑定后扫码登录的就是同一个账号，权限和负责的文档都不变。
+
+当前交付状态：**演示模式可用、真机联调暂停**（试过公众平台测试号 + 公网隧道，排错记录见 `docs/worklog-2026-09-27.md`）。配置项、命令手册、排错对照表和恢复联调的清单都在 `docs/wechat-login-guide.md`；原理和时序见 `docs/wechat-auth-flow.md`；一键起隧道用 `.\tools\wechat-tunnel.ps1`。
+
 ## 查看原型
 
 `http://127.0.0.1:5000/` 是原型入口页，当前只展示文档管理模块原型：
@@ -88,6 +98,30 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned
 再打开 `http://127.0.0.1:5000/`，从入口页进入。文档管理原型的页面不能直接双击打开，因为 `file://` 方式无法调用 Flask API。
 
 ## 常见问题
+
+### 运行 pytest / flask 报 ModuleNotFoundError: No module named 'flask_login'
+
+说明当前终端用的不是本项目的虚拟环境。看提示符就能分辨：`(base)` 是 Anaconda 自带的 Python，`(.venv)` 才是本项目的环境。
+
+本项目的依赖（Flask、Flask-Login、pytest 等）只装在 `.venv` 里，所以有两种正确写法：
+
+```powershell
+# 写法一（推荐）：直接用虚拟环境里的 python，不用管有没有激活
+.\.venv\Scripts\python.exe -m pytest backend\tests -q
+.\.venv\Scripts\python.exe -m flask --app backend\run.py db upgrade
+
+# 写法二：先激活虚拟环境，再直接敲命令
+.\.venv\Scripts\Activate.ps1
+pytest backend\tests -q
+```
+
+想确认当前用的是哪个 python：
+
+```powershell
+python -c "import sys; print(sys.executable)"
+```
+
+输出路径里带 `\.venv\` 才是本项目的环境。另外注意别混用：`.venv` 是 Flask 项目环境，`.django-learning` 是 Django 学习环境，一个终端只激活一个。
 
 ### 打开页面显示 404 Not Found
 

@@ -22,6 +22,25 @@
 | P-07 | 下载确认 | 下载前有确认提示，确认后调用真实下载接口 | ✅ 通过 | 下载接口 = 200，返回 31 字节，SHA256 与上传文件一致，响应头 `Content-Disposition: attachment; filename=acceptance_check.txt`；未登录下载 = 401；下载确认页显示文件名、版本号、上传人 |
 | P-08 | 权限提示 | 非负责人/非管理员看到只读提示，不能上传 | ✅ 通过 | 普通教师上传版本 = 403、建分类 = 403、查看详情与下载 = 200；浏览器里普通教师的详情页显示「你当前为只读权限，不能上传新版本」，且页面上没有上传入口 |
 
+## 微信登录补充验收（2026-09-24）
+
+本期在登录模块上新增了微信扫码登录，验收分两段：接口行为用 pytest 核对（48 个用例全绿，其中微信登录 25 个），页面渲染和浏览器交互需要启动后端再人工走一遍。
+
+| 编号 | 页面/流程 | 验收标准 | 状态 | 证据 |
+| --- | --- | --- | --- | --- |
+| W-01 | 登录页微信入口 | 按后端模式显示入口：`live` 显示「微信扫码登录」、`mock` 显示「模拟微信扫码登录」、`disabled` 显示未开启 | ✅ 接口通过 / ⏳ 待浏览器复验 | `GET /api/auth/wechat/config` 在未配置 `WECHAT_APP_ID` 时返回 `mode=mock`；`app.js` 的 `initWechatLogin()` 按 mode 分支渲染 |
+| W-02 | 模拟扫码登录 | 演示模式下点按钮完成登录；同一个 openid 再登录还是同一个账号 | ✅ 接口通过 / ⏳ 待浏览器复验 | `test_mock_login_creates_wechat_only_account`、`test_mock_login_reuses_user_for_same_openid` |
+| W-03 | 真实扫码链路 | 授权地址带 appid / scope / state；回调校验 state、换 openid、跳结果页；state 不能重放 | ✅ 接口通过（微信接口用 monkeypatch 模拟）/ ⏳ 待真实 AppID 联调 | `test_authorize_url_contains_appid_and_state`、`test_callback_creates_user_and_logs_in`、`test_callback_redirects_browser_to_result_page`、`test_callback_state_cannot_be_reused` |
+| W-04 | 绑定与解绑 | 微信可绑到已有工号（权限不变）；一个微信不能绑两个账号；微信建号禁止解绑 | ✅ 接口通过 / ⏳ 待浏览器复验 | `test_mock_bind_links_wechat_to_current_account`、`test_one_wechat_cannot_bind_two_accounts`、`test_unbind_removes_wechat_binding`、`test_wechat_created_account_cannot_unbind` |
+| W-05 | 数据库迁移 | `users` 新增微信字段可升级可回滚 | ✅ 通过 | 用临时库执行 `upgrade` → 三个字段和唯一索引 `ix_users_wechat_openid` 到位 → `downgrade -1` → 字段移除 → 再 `upgrade` 成功 |
+| W-06 | 免费测试号真机联调 | 用公众平台接口测试号完成一次真实网页授权（openid 来自微信） | ⏸ 暂停（本期按演示模式交付） | 代码已就绪：`mp` 模式带 `connect_redirect=1`、微信内同窗口跳转、`ProxyFix` 修正 https 回调、签名 state 兼容无 cookie、事件日志与 `wechat-log` / `wechat-token-test` 排错命令；接口层用假 `requests` 覆盖真实 HTTP 路径。步骤与检查清单见 `docs/wechat-login-guide.md` 第 6 节，搁置原因见 `docs/worklog-2026-09-27.md` |
+
+浏览器复验步骤（还没做，建议补一次）：
+
+1. 启动后端，打开 `http://127.0.0.1:5000/documents/index.html`，确认微信入口出现并可登录。
+2. 用工号密码登录后进「账号设置」，走一遍绑定微信 / 解绑微信，确认「登录方式」「微信绑定」文案和顶部「微信」标记同步变化。
+3. 配好真实 `WECHAT_APP_ID` 后用真实微信走一次授权（没有正式应用时用免费测试号，步骤见 `docs/wechat-login-guide.md` 第 6 节），核对回跳地址与结果页提示。
+
 ## 本次验收发现并修复的问题
 
 | 问题 | 现象 | 原因 | 处理 |
