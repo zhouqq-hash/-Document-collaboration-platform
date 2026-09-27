@@ -2,7 +2,7 @@ import io
 
 from conftest import create_document, login
 
-#十个测试用例
+#23 个测试用例
 def test_health(client):
     response = client.get("/api/health")
     assert response.status_code == 200
@@ -124,3 +124,135 @@ def test_admin_can_create_category(client):
     )
     assert response.status_code == 201
     assert response.get_json()["data"]["name"] == "新分类"
+
+
+def test_admin_can_list_users(client):
+    login(client, "admin", "admin123")
+    response = client.get("/api/users")
+    assert response.status_code == 200
+    users = response.get_json()["data"]
+    assert {user["username"] for user in users} == {"admin", "teacher", "other"}
+    assert all("password_hash" not in user for user in users)
+
+
+def test_teacher_cannot_list_users(client):
+    login(client)
+    response = client.get("/api/users")
+    assert response.status_code == 403
+
+
+def test_admin_can_update_document(client):
+    document = create_document(client).get_json()["data"]
+
+    response = client.patch(
+        f"/api/documents/{document['id']}",
+        json={"title": "更新后的标题", "owner_id": 3, "description": "更新说明"},
+    )
+    assert response.status_code == 200
+    data = response.get_json()["data"]
+    assert data["title"] == "更新后的标题"
+    assert data["owner"]["username"] == "other"
+    assert data["description"] == "更新说明"
+
+
+def test_teacher_cannot_update_document(client):
+    document = create_document(client).get_json()["data"]
+    client.post("/api/auth/logout")
+    login(client, "teacher", "teacher123")
+
+    response = client.patch(
+        f"/api/documents/{document['id']}",
+        json={"title": "越权修改"},
+    )
+    assert response.status_code == 403
+
+
+def test_update_document_rejects_missing_category(client):
+    document = create_document(client).get_json()["data"]
+
+    response = client.patch(
+        f"/api/documents/{document['id']}",
+        json={"category_id": 999},
+    )
+    assert response.status_code == 404
+    assert response.get_json()["error"]["code"] == "category_not_found"
+
+
+def test_document_has_default_active_status(client):
+    document = create_document(client).get_json()["data"]
+    assert document["status"] == "active"
+
+
+def test_admin_can_change_document_status(client):
+    document = create_document(client).get_json()["data"]
+
+    response = client.patch(
+        f"/api/documents/{document['id']}",
+        json={"status": "deprecated"},
+    )
+    assert response.status_code == 200
+    assert response.get_json()["data"]["status"] == "deprecated"
+
+    archived = client.get("/api/documents?status=deprecated")
+    active = client.get("/api/documents?status=active")
+    assert len(archived.get_json()["data"]) == 1
+    assert len(active.get_json()["data"]) == 0
+
+
+def test_update_document_rejects_invalid_status(client):
+    document = create_document(client).get_json()["data"]
+
+    response = client.patch(
+        f"/api/documents/{document['id']}",
+        json={"status": "bogus"},
+    )
+    assert response.status_code == 400
+    assert response.get_json()["error"]["code"] == "invalid_status"
+
+
+def test_admin_can_update_category(client):
+    login(client, "admin", "admin123")
+    response = client.patch(
+        "/api/categories/1",
+        json={"name": "专业培养计划（修订）", "sort_order": 5},
+    )
+    assert response.status_code == 200
+    assert response.get_json()["data"]["name"] == "专业培养计划（修订）"
+    assert response.get_json()["data"]["sort_order"] == 5
+
+
+def test_teacher_cannot_update_category(client):
+    login(client)
+    response = client.patch(
+        "/api/categories/1",
+        json={"name": "越权改名"},
+    )
+    assert response.status_code == 403
+
+
+def test_admin_can_delete_empty_category(client):
+    login(client, "admin", "admin123")
+    created = client.post(
+        "/api/categories", json={"name": "待删除分类", "sort_order": 20}
+    )
+    category_id = created.get_json()["data"]["id"]
+
+    response = client.delete(f"/api/categories/{category_id}")
+    assert response.status_code == 204
+
+    categories = client.get("/api/categories").get_json()["data"]
+    assert all(item["id"] != category_id for item in categories)
+
+
+def test_teacher_cannot_delete_category(client):
+    login(client)
+    response = client.delete("/api/categories/2")
+    assert response.status_code == 403
+
+
+def test_delete_category_with_documents_rejected(client):
+    create_document(client)
+
+    response = client.delete("/api/categories/1")
+    assert response.status_code == 409
+    assert response.get_json()["error"]["code"] == "category_has_documents"

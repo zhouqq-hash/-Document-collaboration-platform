@@ -5,9 +5,21 @@ from werkzeug.security import check_password_hash, generate_password_hash
 
 from . import db
 
+USER_ROLES = {"admin", "teacher"}
+
 
 def utcnow():
     return datetime.now(timezone.utc)
+
+
+def iso_utc(dt):
+    """把数据库里的 naive 时间当作 UTC 序列化，避免前端按本地时间误读。"""
+    if dt is None:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.isoformat()
+
 
 # 用户表
 class User(UserMixin, db.Model):
@@ -16,8 +28,15 @@ class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(64), unique=True, nullable=False, index=True)
     name = db.Column(db.String(80), nullable=False)
-    password_hash = db.Column(db.String(255), nullable=False)
+    # 微信建号没有密码，password_hash 允许为空，此时只能用微信登录
+    password_hash = db.Column(db.String(255), nullable=True)
     role = db.Column(db.String(16), nullable=False, default="teacher")
+    # 微信登录标识
+    wechat_openid = db.Column(
+        db.String(64), unique=True, nullable=True, index=True
+    )
+    wechat_unionid = db.Column(db.String(64), nullable=True)
+    avatar_url = db.Column(db.String(255), nullable=True)
 # 用户与文档的关系
     owned_documents = db.relationship("Document", back_populates="owner")
     uploaded_versions = db.relationship(
@@ -28,11 +47,22 @@ class User(UserMixin, db.Model):
         self.password_hash = generate_password_hash(password)
 
     def check_password(self, password):
+        if not password or not self.password_hash:
+            # 微信建号没有密码，不参与工号密码登录
+            return False
         return check_password_hash(self.password_hash, password)
 
     @property
     def is_admin(self):
         return self.role == "admin"
+
+    @property
+    def wechat_bound(self):
+        return bool(self.wechat_openid)
+
+    @property
+    def password_login_enabled(self):
+        return bool(self.password_hash)
 
     def to_dict(self):
         return {
@@ -40,6 +70,9 @@ class User(UserMixin, db.Model):
             "username": self.username,
             "name": self.name,
             "role": self.role,
+            "wechat_bound": self.wechat_bound,
+            "password_login": self.password_login_enabled,
+            "avatar_url": self.avatar_url or "",
         }
 
 #DocumentCategory 分类表
@@ -59,7 +92,7 @@ class DocumentCategory(db.Model):
             "name": self.name,
             "sort_order": self.sort_order,
             "document_count": len(self.documents),
-            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "created_at": iso_utc(self.created_at),
         }
 
 #Document 文档表
@@ -82,6 +115,9 @@ class Document(db.Model):
         order_by="DocumentVersion.version_number.desc()",
     )
     description = db.Column(db.String(500), default="")
+    status = db.Column(
+        db.String(16), nullable=False, default="active", server_default="active"
+    )
     
     #获取最新版本
     @property
@@ -97,8 +133,9 @@ class Document(db.Model):
             "current_version": (
                 self.current_version.to_dict() if self.current_version else None
             ),
-            "updated_at": self.updated_at.isoformat(),
+            "updated_at": iso_utc(self.updated_at),
             "description": self.description,
+            "status": self.status,
         }
         if include_versions:
             data["versions"] = [v.to_dict() for v in self.versions]
@@ -135,5 +172,5 @@ class DocumentVersion(db.Model):
             "filename": self.filename,
             "changelog": self.changelog,
             "uploader": self.uploader.to_dict(),
-            "created_at": self.created_at.isoformat(),
+            "created_at": iso_utc(self.created_at),
         }
