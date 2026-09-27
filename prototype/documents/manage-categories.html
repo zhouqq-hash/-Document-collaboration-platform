@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>分类管理 · 教学文档协作平台</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body data-page="manageCategories">
+    <header class="topbar">
+      <a class="brand" href="categories.html">教学文档协作平台</a>
+      <div id="topbar"></div>
+    </header>
+    <main class="container">
+      <h1 class="page-title">分类管理</h1>
+      <p class="page-subtitle">仅管理员可新建、改名和删除分类。</p>
+      <div id="pageMessage"></div>
+      <div class="card" id="createCategoryCard">
+        <h2 id="categoryFormTitle">新建分类</h2>
+        <form id="createCategoryForm" class="form-grid">
+          <div>
+            <label for="categoryName">分类名称</label>
+            <input id="categoryName" name="name" required />
+          </div>
+          <div>
+            <label for="sortOrder">排序值</label>
+            <input id="sortOrder" name="sort_order" type="number" value="0" />
+          </div>
+          <div class="actions">
+            <button class="btn btn-primary" id="categorySubmitButton" type="submit">新建分类</button>
+            <button class="btn btn-outline" id="categoryCancelButton" type="button" hidden>取消</button>
+          </div>
+        </form>
+      </div>
+      <div class="card" id="categoryManageCard">
+        <h2>分类列表</h2>
+        <div id="categoryManageList"></div>
+      </div>
+    </main>
+    <script src="app.js"></script>
+  </body>
+</html>

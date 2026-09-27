@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>编辑文档 · 教学文档协作平台</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body data-page="editDocument">
+    <header class="topbar">
+      <a class="brand" href="categories.html">教学文档协作平台</a>
+      <div id="topbar"></div>
+    </header>
+    <main class="container">
+      <h1 class="page-title">编辑文档</h1>
+      <p class="page-subtitle">文档：<span id="docTitle"></span>（仅管理员可修改）</p>
+      <div id="pageMessage"></div>
+      <div class="card">
+        <form id="editDocumentForm" class="form-grid">
+          <div>
+            <label for="title">文档标题</label>
+            <input id="title" name="title" required />
+          </div>
+          <div>
+            <label>所属分类</label>
+            <div id="categorySelect"></div>
+          </div>
+          <div>
+            <label>负责人</label>
+            <div id="ownerSelect"></div>
+          </div>
+          <div>
+            <label>状态</label>
+            <div id="statusSelect"></div>
+          </div>
+          <div>
+            <label for="description">文档说明</label>
+            <textarea id="description" name="description" rows="3"></textarea>
+          </div>
+          <div class="actions">
+            <button class="btn btn-primary" type="submit">保存修改</button>
+            <a class="btn btn-outline" href="document-detail.html" id="backLink">返回详情</a>
+          </div>
+        </form>
+      </div>
+    </main>
+    <script src="app.js"></script>
+  </body>
+</html>
