@@ -5,12 +5,32 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>原型入口 · 教学文档协作平台</title>
     <style>
+      /*
+       * 入口页样式：与 prototype/documents/styles.css 共用同一套设计基线
+       * （主色阶、圆角、阴影、间距、动效）。页面是独立静态页，所以内联一份，
+       * 新增页面时请对齐这里的取值。
+       */
       :root {
-        --brand: #2f5f9e;
-        --brand-dark: #1f4473;
+        --brand-50: #eef4fb;
+        --brand-100: #dce8f6;
+        --brand-500: #3b76bf;
+        --brand-600: #2f5f9e;
+        --brand-700: #1f4473;
+        --accent: #e8a33d;
+        --text: #1f2937;
+        --heading: #14243d;
+        --muted: #64748b;
         --border: #e3e8ef;
-        --muted: #6b7280;
-        --bg: #f5f7fa;
+        --bg: #f4f7fb;
+        --surface: #fff;
+
+        --radius-sm: 8px;
+        --radius: 12px;
+        --shadow-card: 0 1px 2px rgba(15, 23, 42, 0.04);
+        --shadow-hover: 0 12px 28px rgba(15, 23, 42, 0.1);
+        --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+        --t: 180ms;
+        --t-fast: 150ms;
       }
 
       * {
@@ -19,88 +39,189 @@
 
       body {
         margin: 0;
-        font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
-        background: var(--bg);
-        color: #1f2937;
+        min-height: 100vh;
+        font-family: "Segoe UI", "Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", sans-serif;
+        font-size: 15px;
+        line-height: 1.65;
+        color: var(--text);
+        background-color: var(--bg);
+        background-image: radial-gradient(1100px 400px at 50% -180px, var(--brand-50), rgba(238, 244, 251, 0) 70%);
+        background-repeat: no-repeat;
+        background-attachment: fixed;
+      }
+
+      ::selection {
+        background: rgba(59, 118, 191, 0.18);
+      }
+
+      :focus-visible {
+        outline: 3px solid rgba(59, 118, 191, 0.35);
+        outline-offset: 2px;
+      }
+
+      code {
+        font-family: "Cascadia Mono", Consolas, "Courier New", monospace;
+        font-size: 0.92em;
+        padding: 1px 6px;
+        border-radius: 5px;
+        background: var(--brand-50);
+        color: var(--brand-700);
       }
 
       .topbar {
         display: flex;
         align-items: center;
         justify-content: space-between;
-        padding: 14px 24px;
-        background: #fff;
+        gap: 24px;
+        padding: 12px 32px;
+        background: rgba(255, 255, 255, 0.94);
+        backdrop-filter: saturate(180%) blur(8px);
         border-bottom: 1px solid var(--border);
+        box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
       }
 
       .brand {
-        font-size: 18px;
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 17px;
         font-weight: 700;
-        color: var(--brand);
+        letter-spacing: 0.01em;
+        color: var(--brand-700);
+      }
+
+      .brand-mark {
+        display: block;
+        flex: none;
+        width: 28px;
+        height: 28px;
+        border-radius: 9px;
+        box-shadow: 0 4px 10px rgba(47, 95, 158, 0.28);
+      }
+
+      .topbar-note {
+        font-size: 14px;
+        color: var(--muted);
       }
 
       .container {
-        max-width: 980px;
+        max-width: 1120px;
         margin: 0 auto;
-        padding: 32px 24px 48px;
+        padding: 32px 32px 64px;
+        animation: page-in var(--t) var(--ease) both;
+      }
+
+      .page-head {
+        position: relative;
+        padding-left: 16px;
+        margin: 0 0 28px;
+      }
+
+      .page-head::before {
+        content: "";
+        position: absolute;
+        left: 0;
+        top: 4px;
+        bottom: 4px;
+        width: 4px;
+        border-radius: 999px;
+        background: linear-gradient(180deg, var(--brand-500), var(--brand-700));
       }
 
       h1 {
-        font-size: 24px;
-        margin: 0 0 8px;
+        margin: 0 0 6px;
+        font-size: 28px;
+        font-weight: 600;
+        letter-spacing: -0.01em;
+        color: var(--heading);
       }
 
       .subtitle {
+        margin: 0;
+        font-size: 14px;
         color: var(--muted);
-        margin: 0 0 28px;
-        line-height: 1.7;
       }
 
       .grid {
         display: grid;
-        grid-template-columns: minmax(0, 620px);
+        grid-template-columns: minmax(0, 660px);
         gap: 20px;
       }
 
       .card {
+        position: relative;
         display: block;
-        background: #fff;
+        overflow: hidden;
+        padding: 24px;
+        background: var(--surface);
         border: 1px solid var(--border);
-        border-radius: 10px;
-        padding: 20px;
-        text-decoration: none;
+        border-radius: var(--radius);
+        box-shadow: var(--shadow-card);
         color: inherit;
-        transition: box-shadow 0.2s, transform 0.2s;
+        text-decoration: none;
+        transition: box-shadow var(--t) var(--ease), transform var(--t) var(--ease),
+          border-color var(--t) var(--ease);
+      }
+
+      .card::after {
+        content: "";
+        position: absolute;
+        inset: 0 0 auto 0;
+        height: 4px;
+        background: linear-gradient(90deg, var(--brand-500), var(--brand-100));
       }
 
       .card:hover {
-        box-shadow: 0 6px 18px rgba(47, 95, 158, 0.12);
-        transform: translateY(-2px);
+        transform: translateY(-3px);
+        border-color: var(--brand-100);
+        box-shadow: var(--shadow-hover);
       }
 
       .card h2 {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin: 0 0 12px;
         font-size: 18px;
-        margin: 0 0 10px;
-        color: var(--brand-dark);
+        font-weight: 600;
+        color: var(--heading);
+      }
+
+      .card h2 .card-icon {
+        display: block;
+        flex: none;
+        width: 26px;
+        height: 26px;
       }
 
       .card p {
-        margin: 0 0 12px;
+        margin: 0 0 14px;
+        font-size: 14px;
         color: var(--muted);
-        line-height: 1.7;
       }
 
       .tag {
-        display: inline-block;
-        font-size: 12px;
-        padding: 2px 8px;
-        border-radius: 999px;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
         margin-bottom: 12px;
+        padding: 2px 10px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 500;
+      }
+
+      .tag::before {
+        content: "";
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: currentColor;
       }
 
       .tag-live {
-        background: #e6f0fb;
-        color: var(--brand-dark);
+        background: var(--brand-50);
+        color: var(--brand-700);
       }
 
       .tag-static {
@@ -111,46 +232,98 @@
       .list {
         margin: 0;
         padding-left: 18px;
-        color: #374151;
-        line-height: 1.8;
         font-size: 14px;
+        line-height: 1.9;
+        color: #374151;
+      }
+
+      .list li::marker {
+        color: var(--brand-500);
       }
 
       .note {
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
         margin-top: 28px;
-        background: #fff;
-        border: 1px solid var(--border);
-        border-radius: 10px;
-        padding: 18px 20px;
-        color: var(--muted);
-        line-height: 1.8;
+        padding: 16px 20px;
         font-size: 14px;
+        line-height: 1.8;
+        color: var(--brand-700);
+        background: rgba(255, 255, 255, 0.85);
+        border: 1px solid var(--brand-100);
+        border-left: 4px solid var(--brand-500);
+        border-radius: var(--radius);
       }
 
-      .note code {
-        background: var(--bg);
-        padding: 1px 6px;
-        border-radius: 4px;
-        color: var(--brand-dark);
+      .note-icon {
+        flex: none;
+        width: 18px;
+        height: 18px;
+        margin-top: 3px;
+      }
+
+      @keyframes page-in {
+        from {
+          opacity: 0;
+          transform: translateY(6px);
+        }
+        to {
+          opacity: 1;
+          transform: none;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+          animation-duration: 0.001ms !important;
+          animation-iteration-count: 1 !important;
+          transition-duration: 0.001ms !important;
+        }
       }
     </style>
   </head>
   <body>
     <header class="topbar">
-      <span class="brand">教学文档协作平台</span>
-      <span style="color: var(--muted); font-size: 14px">业务方向 · 原型入口</span>
+      <span class="brand">
+        <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+          <defs>
+            <linearGradient id="brandMarkGradient" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="#4b86cf" />
+              <stop offset="100%" stop-color="#1f4473" />
+            </linearGradient>
+          </defs>
+          <rect width="32" height="32" rx="9" fill="url(#brandMarkGradient)" />
+          <path d="M12.2 7.5h6.1L22 11.2V23a1.6 1.6 0 0 1-1.6 1.6h-8.2A1.6 1.6 0 0 1 10.6 23V9.1A1.6 1.6 0 0 1 12.2 7.5Z" fill="#ffffff" />
+          <path d="M18.3 7.5 22 11.2h-3.7z" fill="#c9dcf3" />
+          <path d="M13.8 15.2h5.4M13.8 18.6h5.4" fill="none" stroke="#3b76bf" stroke-width="1.5" stroke-linecap="round" />
+        </svg>
+        <span>教学文档协作平台</span>
+      </span>
+      <span class="topbar-note">业务方向 · 原型入口</span>
     </header>
 
     <main class="container">
-      <h1>原型入口</h1>
-      <p class="subtitle">
-        当前演示文档管理模块原型：已经接入真实 Flask API，登录后可以查看分类、文档和历史版本，并上传、下载文件。
-      </p>
+      <header class="page-head">
+        <h1>原型入口</h1>
+        <p class="subtitle">
+          当前演示文档管理模块原型：已经接入真实 Flask API，登录后可以查看分类、文档和历史版本，并上传、下载文件。
+        </p>
+      </header>
 
       <div class="grid">
         <a class="card" href="documents/index.html">
           <span class="tag tag-live">已接入 Flask API</span>
-          <h2>文档管理原型（documents）</h2>
+          <h2>
+            <svg class="card-icon" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+              <rect width="32" height="32" rx="9" fill="#eef4fb" />
+              <path d="M11.5 8h6.4l3.6 3.7V23a1.5 1.5 0 0 1-1.5 1.5h-8.5A1.5 1.5 0 0 1 10 23V9.5A1.5 1.5 0 0 1 11.5 8Z" fill="#ffffff" stroke="#3b76bf" stroke-width="1.2" />
+              <path d="M13.4 15.1h5.2M13.4 18.3h5.2" stroke="#3b76bf" stroke-width="1.4" stroke-linecap="round" />
+            </svg>
+            <span>文档管理原型（documents）</span>
+          </h2>
           <p>文档分类、文档列表、文档详情、上传新版本、历史版本、下载确认。</p>
           <ul class="list">
             <li>7 个页面，登录后才能访问</li>
@@ -162,8 +335,15 @@
       </div>
 
       <div class="note">
-        访问方式：先运行 <code>.\\.venv\\Scripts\\python.exe backend\\run.py</code>，再打开
-        <code>http://127.0.0.1:5000/</code> 回到本入口页，然后从上面的卡片进入文档管理原型。
+        <svg class="note-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false">
+          <circle cx="12" cy="12" r="9" stroke="#2f5f9e" stroke-width="1.8" />
+          <path d="M12 11v6" stroke="#2f5f9e" stroke-width="1.8" stroke-linecap="round" />
+          <circle cx="12" cy="7.6" r="1.1" fill="#2f5f9e" />
+        </svg>
+        <span>
+          访问方式：先运行 <code>.\\.venv\\Scripts\\python.exe backend\\run.py</code>，再打开
+          <code>http://127.0.0.1:5000/</code> 回到本入口页，然后从上面的卡片进入文档管理原型。
+        </span>
       </div>
     </main>
   </body>

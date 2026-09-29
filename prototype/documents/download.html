@@ -8,11 +8,27 @@
   </head>
   <body data-page="download">
     <header class="topbar">
-      <a class="brand" href="categories.html">教学文档协作平台</a>
+      <a class="brand" href="categories.html">
+        <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+          <defs>
+            <linearGradient id="brandMarkGradient" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="#4b86cf" />
+              <stop offset="100%" stop-color="#1f4473" />
+            </linearGradient>
+          </defs>
+          <rect width="32" height="32" rx="9" fill="url(#brandMarkGradient)" />
+          <path d="M12.2 7.5h6.1L22 11.2V23a1.6 1.6 0 0 1-1.6 1.6h-8.2A1.6 1.6 0 0 1 10.6 23V9.1A1.6 1.6 0 0 1 12.2 7.5Z" fill="#ffffff" />
+          <path d="M18.3 7.5 22 11.2h-3.7z" fill="#c9dcf3" />
+          <path d="M13.8 15.2h5.4M13.8 18.6h5.4" fill="none" stroke="#3b76bf" stroke-width="1.5" stroke-linecap="round" />
+        </svg>
+        <span>教学文档协作平台</span>
+      </a>
       <div id="topbar"></div>
     </header>
     <main class="container">
-      <h1 class="page-title">下载确认</h1>
+      <header class="page-head">
+        <h1 class="page-title">下载确认</h1>
+      </header>
       <div id="download"></div>
     </main>
     <script src="app.js"></script>
