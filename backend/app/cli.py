@@ -1,9 +1,11 @@
 import shutil
+from io import BytesIO
 from pathlib import Path
 from urllib.parse import urlsplit
 
 import click
 from flask import current_app
+from werkzeug.datastructures import FileStorage
 from werkzeug.security import generate_password_hash
 
 from . import db
@@ -56,6 +58,18 @@ DEMO_ACCOUNTS = [
 ]
 
 
+def _save_demo_file(app, stored_name, content):
+    """演示文件也走存储抽象层。
+
+    直接写本地目录的话，切到 COS 后示例文档的 file_path 指向的对象并不在桶里，
+    下载就会 500 —— 演示数据必须和真实上传走同一条存储路径。
+    """
+    app.extensions["storage"].save(
+        FileStorage(stream=BytesIO(content.encode("utf-8")), filename=stored_name),
+        stored_name,
+    )
+
+
 def seed_demo_data(app):
     """写入演示账号、分类和文档。已存在的记录不重复创建，可以反复执行。"""
     db.create_all()
@@ -81,9 +95,6 @@ def seed_demo_data(app):
 
     db.session.flush()
 
-    media_dir = Path(app.config["UPLOAD_FOLDER"])
-    media_dir.mkdir(parents=True, exist_ok=True)
-
     for spec in DEMO_DOCUMENTS:
         if Document.query.filter_by(title=spec["title"]).first() is not None:
             continue
@@ -98,9 +109,7 @@ def seed_demo_data(app):
         db.session.add(document)
         db.session.flush()
 
-        (media_dir / spec["stored_name"]).write_text(
-            spec["content"], encoding="utf-8"
-        )
+        _save_demo_file(app, spec["stored_name"], spec["content"])
         db.session.add(
             DocumentVersion(
                 document=document,
@@ -162,6 +171,11 @@ def register_commands(app):
         print("Demo environment reset. Database and demo data are back to the initial state.")
         if not keep_media:
             print(f"Removed {removed} item(s) from {media_dir}")
+        if str(app.config.get("STORAGE_BACKEND") or "local").lower() == "cos":
+            print(
+                "Note: files already stored in COS are not deleted; "
+                "the three sample objects are overwritten."
+            )
         print("Accounts: admin/admin123, teacher/teacher123, viewer/viewer123")
         print("Documents: 3 (active / archived / deprecated)")
 
