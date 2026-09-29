@@ -5,7 +5,8 @@
 ## 0. 演示前 5 分钟：环境检查
 
 ```powershell
-cd 'D:\Users\Administrator\Documents\ChatGPT\项目招募：文档协作平台'
+# 在仓库根目录执行：把下面的路径换成你自己 clone 或解压出来的目录
+cd 'C:\path\to\doc-collab-platform'
 
 # ① 确认 5000 端口没被别的程序占用（如果输出里有 LISTENING，先停掉那个进程）
 netstat -ano | findstr :5000
