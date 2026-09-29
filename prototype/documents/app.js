@@ -31,6 +31,18 @@ const STATUS_LABELS = {
   deprecated: "废弃",
 };
 
+// 与服务端 config.py 的 ALLOWED_EXTENSIONS 保持一致：
+// 只作为「选择文件」对话框的类型过滤提示，最终仍以服务端校验为准。
+const ALLOWED_FILE_ACCEPT = ".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt";
+
+function applyFileAccept(inputId) {
+  const input = document.getElementById(inputId);
+  if (input) {
+    input.accept = ALLOWED_FILE_ACCEPT;
+  }
+  return input;
+}
+
 function statusBadge(status) {
   const label = STATUS_LABELS[status] || status;
   return `<span class="status-badge status-${status}">${escapeHtml(label)}</span>`;
@@ -223,19 +235,21 @@ async function apiRequest(path, options = {}, { redirectOn401 = true } = {}) {
 
   const response = await fetch(path, config);
 
-  if (response.status === 401) {
-    if (redirectOn401 && document.body.dataset.page !== "login") {
-      window.location.href = "index.html";
-    }
-    const error = new Error("请先登录");
-    error.status = 401;
-    throw error;
-  }
-
+  // 先读 body 再判断状态：401（登录失败）和 413（文件超限）都要用服务端给的文案，
+  // 不能一律替换成「请先登录」或「请求失败（状态码）」。
   let payload = null;
   const contentType = response.headers.get("content-type") || "";
   if (contentType.includes("application/json")) {
     payload = await response.json();
+  }
+
+  if (response.status === 401) {
+    if (redirectOn401 && document.body.dataset.page !== "login") {
+      window.location.href = "index.html";
+    }
+    const error = new Error(payload?.error?.message || "请先登录");
+    error.status = 401;
+    throw error;
   }
 
   if (!response.ok) {
@@ -867,7 +881,11 @@ async function initDocuments() {
         } else {
           next.delete("category_id");
         }
-        window.location.search = next.toString();
+        // 直接用 pathname 拼查询串：给 location.search 赋空串会留下一个多余的「?」
+        const query = next.toString();
+        window.location.href = query
+          ? `${window.location.pathname}?${query}`
+          : window.location.pathname;
       },
     });
     filterWrap.replaceChildren(filter.root);
@@ -957,6 +975,7 @@ async function initUpload() {
   const documentId = qs("id");
   const form = document.getElementById("uploadForm");
   const backLink = document.getElementById("backLink");
+  applyFileAccept("file");
 
   try {
     const doc = await apiRequest(`/api/documents/${documentId}`);
@@ -1080,6 +1099,7 @@ async function initDownload() {
 async function initCreateDocument() {
   const user = await requireUser();
   const form = document.getElementById("createDocumentForm");
+  applyFileAccept("file");
 
   if (user.role !== "admin") {
     form.closest(".card").style.display = "none";

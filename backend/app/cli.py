@@ -1,3 +1,4 @@
+import shutil
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -9,81 +10,160 @@ from . import db
 from .models import Document, DocumentCategory, DocumentVersion, User
 
 
+DEMO_CATEGORIES = [
+    "专业培养计划",
+    "教学大纲",
+    "毕业设计要求",
+    "考核分析报告",
+    "其他",
+]
+
+# 三篇演示文档覆盖三种状态，测试时不用自己造数据就能看到状态徽标
+DEMO_DOCUMENTS = [
+    {
+        "title": "2026级计算机科学与技术专业培养计划",
+        "category": "专业培养计划",
+        "owner": "teacher",
+        "status": "active",
+        "stored_name": "sample_program_v1.txt",
+        "filename": "2026级培养计划_v1.txt",
+        "content": "示例文档：这是文档管理模块的样例内容。",
+    },
+    {
+        "title": "2026版计算机科学与技术专业教学大纲",
+        "category": "教学大纲",
+        "owner": "teacher",
+        "status": "archived",
+        "stored_name": "sample_syllabus_v1.txt",
+        "filename": "2026版教学大纲_v1.txt",
+        "content": "示例文档：这是教学大纲的样例内容。",
+    },
+    {
+        "title": "2025-2026学年课程考核分析报告",
+        "category": "考核分析报告",
+        "owner": "admin",
+        "status": "deprecated",
+        "stored_name": "sample_report_v1.txt",
+        "filename": "考核分析报告_v1.txt",
+        "content": "示例文档：这是考核分析报告的样例内容。",
+    },
+]
+
+DEMO_ACCOUNTS = [
+    ("admin", "管理员", "admin", "admin123"),
+    ("teacher", "胡军成", "teacher", "teacher123"),
+    ("viewer", "王老师", "teacher", "viewer123"),
+]
+
+
+def seed_demo_data(app):
+    """写入演示账号、分类和文档。已存在的记录不重复创建，可以反复执行。"""
+    db.create_all()
+
+    users = {}
+    for username, name, role, password in DEMO_ACCOUNTS:
+        user = User.query.filter_by(username=username).first()
+        if user is None:
+            user = User(username=username, name=name, role=role)
+            user.password_hash = generate_password_hash(password)
+            db.session.add(user)
+        users[username] = user
+
+    db.session.flush()
+
+    categories = {}
+    for order, name in enumerate(DEMO_CATEGORIES):
+        category = DocumentCategory.query.filter_by(name=name).first()
+        if category is None:
+            category = DocumentCategory(name=name, sort_order=order)
+            db.session.add(category)
+        categories[name] = category
+
+    db.session.flush()
+
+    media_dir = Path(app.config["UPLOAD_FOLDER"])
+    media_dir.mkdir(parents=True, exist_ok=True)
+
+    for spec in DEMO_DOCUMENTS:
+        if Document.query.filter_by(title=spec["title"]).first() is not None:
+            continue
+
+        owner = users[spec["owner"]]
+        document = Document(
+            title=spec["title"],
+            category=categories[spec["category"]],
+            owner=owner,
+            status=spec["status"],
+        )
+        db.session.add(document)
+        db.session.flush()
+
+        (media_dir / spec["stored_name"]).write_text(
+            spec["content"], encoding="utf-8"
+        )
+        db.session.add(
+            DocumentVersion(
+                document=document,
+                version_number=1,
+                filename=spec["filename"],
+                file_path=spec["stored_name"],
+                changelog="初始版本",
+                uploader=owner,
+            )
+        )
+
+    db.session.commit()
+
+
 def register_commands(app):
     @app.cli.command("seed")
     def seed():
-        """Create demo users, categories and one sample document."""
-        db.create_all()
-
-        admin = User.query.filter_by(username="admin").first()
-        if admin is None:
-            admin = User(username="admin", name="管理员", role="admin")
-            admin.password_hash = generate_password_hash("admin123")
-            db.session.add(admin)
-
-        teacher = User.query.filter_by(username="teacher").first()
-        if teacher is None:
-            teacher = User(username="teacher", name="胡军成", role="teacher")
-            teacher.password_hash = generate_password_hash("teacher123")
-            db.session.add(teacher)
-
-        viewer = User.query.filter_by(username="viewer").first()
-        if viewer is None:
-            viewer = User(username="viewer", name="王老师", role="teacher")
-            viewer.password_hash = generate_password_hash("viewer123")
-            db.session.add(viewer)
-
-        db.session.flush()
-
-        category_names = [
-            "专业培养计划",
-            "教学大纲",
-            "毕业设计要求",
-            "考核分析报告",
-            "其他",
-        ]
-        categories = []
-        for order, name in enumerate(category_names):
-            category = DocumentCategory.query.filter_by(name=name).first()
-            if category is None:
-                category = DocumentCategory(name=name, sort_order=order)
-                db.session.add(category)
-            categories.append(category)
-
-        db.session.flush()
-
-        sample = Document.query.filter_by(
-            title="2026级计算机科学与技术专业培养计划"
-        ).first()
-        if sample is None:
-            sample = Document(
-                title="2026级计算机科学与技术专业培养计划",
-                category=categories[0],
-                owner=teacher,
-            )
-            db.session.add(sample)
-            db.session.flush()
-
-            media_dir = Path(app.config["UPLOAD_FOLDER"])
-            media_dir.mkdir(parents=True, exist_ok=True)
-            stored_name = "sample_program_v1.txt"
-            (media_dir / stored_name).write_text(
-                "示例文档：这是文档管理模块的样例内容。",
-                encoding="utf-8",
-            )
-            version = DocumentVersion(
-                document=sample,
-                version_number=1,
-                filename="2026级培养计划_v1.txt",
-                file_path=stored_name,
-                changelog="初始版本",
-                uploader=teacher,
-            )
-            db.session.add(version)
-
-        db.session.commit()
+        """Create demo users, categories and sample documents (idempotent)."""
+        seed_demo_data(app)
         print("Seed completed.")
         print("Accounts: admin/admin123, teacher/teacher123, viewer/viewer123")
+        print("Documents: 3 (active / archived / deprecated)")
+
+    @app.cli.command("demo-reset")
+    @click.option("--yes", is_flag=True, help="Skip the confirmation prompt.")
+    @click.option(
+        "--keep-media",
+        is_flag=True,
+        help="Reset the database only and keep uploaded files.",
+    )
+    def demo_reset(yes, keep_media):
+        """Reset the demo environment: wipe the database and uploads, then seed again.
+
+        测试同学跑完一轮后执行这条命令，下一轮就能从同样的初始状态开始。
+        """
+        if not yes:
+            click.confirm(
+                "This will erase the database and uploaded files. Continue?",
+                abort=True,
+            )
+
+        media_dir = Path(app.config["UPLOAD_FOLDER"])
+        removed = 0
+        if not keep_media and media_dir.exists():
+            for item in sorted(media_dir.iterdir()):
+                if item.name == ".gitkeep":
+                    continue
+                if item.is_dir():
+                    shutil.rmtree(item)
+                else:
+                    item.unlink()
+                removed += 1
+
+        db.session.remove()
+        db.drop_all()
+        db.create_all()
+        seed_demo_data(app)
+
+        print("Demo environment reset. Database and demo data are back to the initial state.")
+        if not keep_media:
+            print(f"Removed {removed} item(s) from {media_dir}")
+        print("Accounts: admin/admin123, teacher/teacher123, viewer/viewer123")
+        print("Documents: 3 (active / archived / deprecated)")
 
     @app.cli.command("wechat-check")
     def wechat_check():

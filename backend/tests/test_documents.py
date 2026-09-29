@@ -1,8 +1,9 @@
 import io
 
+from app.utils import format_size_limit
 from conftest import create_document, login
 
-#23 个测试用例
+#25 个测试用例
 def test_health(client):
     response = client.get("/api/health")
     assert response.status_code == 200
@@ -256,3 +257,37 @@ def test_delete_category_with_documents_rejected(client):
     response = client.delete("/api/categories/1")
     assert response.status_code == 409
     assert response.get_json()["error"]["code"] == "category_has_documents"
+
+
+def test_upload_over_size_limit_returns_readable_error(app_factory):
+    """超过上传上限时返回统一的 JSON 错误，而不是 Flask 默认的 HTML 413 页。"""
+    app = app_factory(MAX_CONTENT_LENGTH=1024)
+    client = app.test_client()
+    login(client, "admin", "admin123")
+
+    response = client.post(
+        "/api/documents",
+        data={
+            "title": "超大文件",
+            "category_id": "1",
+            "owner_id": "2",
+            "changelog": "超限",
+            "file": (io.BytesIO(b"x" * 8192), "big.txt"),
+        },
+        content_type="multipart/form-data",
+    )
+
+    assert response.status_code == 413
+    payload = response.get_json()
+    assert payload["error"]["code"] == "file_too_large"
+    assert "1 KB" in payload["error"]["message"]
+    assert "压缩" in payload["error"]["message"]
+
+
+def test_format_size_limit_is_readable():
+    """50 MB 这类上限要显示成 MB，而不是原始字节数。"""
+    assert format_size_limit(50 * 1024 * 1024) == "50 MB"
+    assert format_size_limit(1024) == "1 KB"
+    assert format_size_limit(0) == ""
+    assert format_size_limit(None) == ""
+    assert format_size_limit("not-a-number") == ""

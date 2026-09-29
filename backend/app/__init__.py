@@ -8,6 +8,7 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 
 from .config import BASE_DIR, Config
 from .storage import get_storage
+from .utils import api_error, format_size_limit
 
 
 db = SQLAlchemy()
@@ -74,6 +75,18 @@ def create_app(config=None):
     def favicon():
         # 浏览器默认会请求它，返回空响应，别让日志里全是 404
         return "", 204
+
+    # 上传超过大小上限时，Flask 默认返回 HTML 错误页，前端读不到 JSON，
+    # 只能显示「请求失败（413）」。这里统一成和其它接口一致的错误结构。
+    @app.errorhandler(413)
+    def payload_too_large(error):
+        size = format_size_limit(app.config.get("MAX_CONTENT_LENGTH"))
+        message = (
+            f"上传文件超过 {size} 上限，请压缩后再上传"
+            if size
+            else "上传文件超过大小上限，请压缩后再上传"
+        )
+        return api_error(message, "file_too_large", 413)
 #托管前端原型（静态文件）
     @app.get("/")
     def prototype_index():

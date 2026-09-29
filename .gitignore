@@ -3,6 +3,7 @@ __pycache__/
 *.py[cod]
 .pytest_cache/
 share/
+testdata/
 backend/.pytest_tmp/
 backend/instance/
 backend/media/*

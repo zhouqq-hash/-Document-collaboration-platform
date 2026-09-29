@@ -223,7 +223,8 @@ next_number = max((v.version_number for v in document.versions), default=0) + 1
 | 模拟登录 | 5 | 微信建号、同 openid 复用、默认身份、非法 openid 400、微信账号无法用工号密码登录 |
 | 绑定与解绑 | 6 | 未登录 401、绑定到已有工号、一个微信不能绑两个账号、一个账号不能绑两个微信、解绑、微信建号禁止解绑 |
 
-实测：`.\.venv\Scripts\python.exe -m pytest backend\tests -q` → `48 passed`。
+实测：`.\.venv\Scripts\python.exe -m pytest backend\tests -q` → `85 passed`（文档模块 25 个 + 微信 60 个）。
+下面微信分组表是 2026-09-24 的 25 个用例快照，09-27 真机联调排错后又补了约 35 个，分组以 `backend/tests/test_wechat.py` 为准。
 
 ## 8. 踩过的坑与结论
 
