@@ -1,0 +1,5 @@
+# 只有把文件存到腾讯云 COS 时才需要装（默认是本地存储 backend/media/）。
+# 安装：
+#   python -m pip install -r backend\requirements-cos.txt
+# 注意：它会附带 crcmod，在 Windows 上可能需要 Visual C++ Build Tools 才能编译。
+cos-python-sdk-v5

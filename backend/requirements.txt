@@ -3,5 +3,8 @@ Flask-SQLAlchemy==3.1.1
 Flask-Migrate==4.1.0
 Flask-Login==0.6.3
 pytest==9.1.1
-cos-python-sdk-v5
 requests==2.34.2
+
+# 腾讯云 COS 的依赖单独放在 requirements-cos.txt：
+# 默认用本地存储 backend/media/，用不到 COS；它会拉一个需要编译的 crcmod，
+# 在 Windows 上没装 Visual C++ Build Tools 会装不上。

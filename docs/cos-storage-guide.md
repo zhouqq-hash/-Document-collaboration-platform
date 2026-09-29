@@ -3,6 +3,16 @@
 代码侧已经完成「本地 / COS 可切换」的存储抽象层，默认走本地 `backend/media/`，
 不会影响现有功能。要真正把文件存到腾讯云 COS，需要你完成下面这些账号和配置操作。
 
+## 零、先装 COS 的依赖
+
+COS 的 SDK 不在默认依赖里（默认用本地存储，装它会顺带拉一个需要编译的 `crcmod`）。要用 COS 时先补上：
+
+```powershell
+python -m pip install -r backend\requirements-cos.txt
+```
+
+如果卡在编译 `crcmod`，在 Windows 上装一下 Visual C++ Build Tools 再重试。
+
 ## 一、准备工作（在腾讯云控制台完成）
 
 1. 注册并登录腾讯云，完成个人或企业实名认证。
