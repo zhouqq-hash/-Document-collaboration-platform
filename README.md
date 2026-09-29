@@ -11,8 +11,6 @@
 
 后端单独运行时，优先查看 `backend/README.md`。
 
-项目分工与人员安排见 `docs/project-division.md`：文档管理模块为当前基线，五人小组下一步做问答管理模块；实现框架当前为 Flask，Django 仅做对照学习（与招募说明的 Django 口径差异待需求方确认）。
-
 文档管理模块的业务走查见 `docs/business-walkthrough.md`。
 
 ## Python 环境说明
