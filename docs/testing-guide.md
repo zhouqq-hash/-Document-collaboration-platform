@@ -10,6 +10,8 @@
 
 ## 1. 环境准备
 
+刚克隆或解压完仓库的同学，先看仓库根目录的 `TESTING.md`（包含 clone / 下载 ZIP、依赖安装和常见问题）；下面这段是同一套命令。
+
 在仓库根目录执行（Windows / PowerShell）：
 
 ```powershell
