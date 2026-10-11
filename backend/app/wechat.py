@@ -9,6 +9,7 @@
 """
 
 import hashlib
+import json
 from datetime import datetime
 from pathlib import Path
 from urllib.parse import quote, urlencode, urlsplit
@@ -378,7 +379,10 @@ def _wechat_get_json(url, params, timeout):
     try:
         response = requests.get(url, params=params, timeout=timeout)
         response.raise_for_status()
-        data = response.json()
+        # 微信接口返回的 Content-Type 常是 text/plain 且不带 charset，
+        # requests 会按 ISO-8859-1 去猜，中文昵称就会解成乱码；
+        # 这里固定按 UTF-8 解析，不依赖自动探测。
+        data = json.loads(response.content.decode("utf-8"))
     except Exception as exc:  # requests 的网络异常和 JSON 解析异常
         raise WeChatAPIError(f"微信接口调用失败：{exc}") from exc
 

@@ -36,16 +36,23 @@ def mock_wechat_profile(code, openid="openid_from_wechat", nickname="张老师")
 
 
 class FakeResponse:
-    """假的 requests 响应，用来在没有外网的情况下验证真实 HTTP 代码路径。"""
+    """假的 requests 响应，用来在没有外网的情况下验证真实 HTTP 代码路径。
+
+    刻意复刻微信接口的坑：Content-Type 是 text/plain 且不带 charset，
+    requests 会按 ISO-8859-1 猜编码。中文昵称只有被正确按 UTF-8 解出来才算过。
+    """
 
     def __init__(self, payload):
         self.payload = payload
+        self.content = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+        self.encoding = "ISO-8859-1"
 
     def raise_for_status(self):
         return None
 
     def json(self):
-        return self.payload
+        # 复刻 requests 的行为：按 self.encoding 解码 content，猜错就是乱码
+        return json.loads(self.content.decode(self.encoding))
 
 
 class FakeTunnelResponse:
@@ -794,6 +801,27 @@ def test_callback_calls_wechat_http_api(app_factory, monkeypatch):
     assert calls[1][0] == wechat.USERINFO_URL
     assert userinfo_params["access_token"] == "token_1"
     assert userinfo_params["openid"] == "openid_real"
+
+
+def test_callback_keeps_chinese_nickname(app_factory, monkeypatch):
+    """微信昵称含中文时，不能被当成拉丁编码解成乱码。"""
+    client = live_app(app_factory).test_client()
+    calls = []
+    monkeypatch.setattr(
+        "requests.get",
+        fake_wechat_http(
+            calls,
+            {"access_token": "token_zh", "openid": "openid_zh"},
+            {"openid": "openid_zh", "nickname": "最简式", "headimgurl": ""},
+        ),
+    )
+
+    state = client.get("/api/auth/wechat/authorize-url").get_json()["data"]["state"]
+    data = client.get(
+        f"/api/auth/wechat/callback?code=zh_code&state={state}&format=json"
+    ).get_json()["data"]
+
+    assert data["name"] == "最简式"
 
 
 def test_callback_surfaces_wechat_errcode(app_factory, monkeypatch):
