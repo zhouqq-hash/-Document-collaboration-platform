@@ -13,3 +13,6 @@ backend/media/*
 *.sqlite3-journal
 .idea/
 .vscode/
+
+# local WeChat live-test credentials (contains AppSecret, never commit)
+tools/*.local.env
