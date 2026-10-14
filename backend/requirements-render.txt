@@ -1,0 +1,4 @@
+# Render（Linux）部署用：在本项目依赖之上补一个生产级 WSGI 服务器。
+# 本地 Windows 用不到 gunicorn，所以单独放这个文件，不动 requirements.txt。
+-r requirements.txt
+gunicorn>=22.0.0

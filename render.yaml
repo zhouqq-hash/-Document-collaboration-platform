@@ -1,0 +1,21 @@
+# Render Blueprint：在 Render 控制台选「New > Blueprint」，指向本仓库即可自动建服务。
+# 手动建 Web Service 的等价配置见 docs/deploy-render.md。
+services:
+  - type: web
+    name: doc-collab
+    runtime: python
+    plan: free
+    branch: main
+    autoDeploy: true
+    buildCommand: pip install -r backend/requirements-render.txt
+    startCommand: bash scripts/render-start.sh
+    healthCheckPath: /api/health
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.9"
+      # Render 生成一个随机密钥，覆盖 config.py 里开发用的默认值
+      - key: SECRET_KEY
+        generateValue: true
+      # 微信登录走演示模式（免费平台没有备案域名，真机联调走不通）
+      - key: WECHAT_MOCK_ENABLED
+        value: "1"
