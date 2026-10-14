@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>话题详情 · 教学文档协作平台</title>
+    <link rel="stylesheet" href="../documents/styles.css" />
+    <link rel="stylesheet" href="qa.css" />
+  </head>
+  <body data-page="topic">
+    <header class="topbar">
+      <a class="brand" href="index.html">
+        <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+          <defs>
+            <linearGradient id="brandMarkGradient" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="#4b86cf" />
+              <stop offset="100%" stop-color="#1f4473" />
+            </linearGradient>
+          </defs>
+          <rect width="32" height="32" rx="9" fill="url(#brandMarkGradient)" />
+          <path d="M12.2 7.5h6.1L22 11.2V23a1.6 1.6 0 0 1-1.6 1.6h-8.2A1.6 1.6 0 0 1 10.6 23V9.1A1.6 1.6 0 0 1 12.2 7.5Z" fill="#ffffff" />
+          <path d="M18.3 7.5 22 11.2h-3.7z" fill="#c9dcf3" />
+          <path d="M13.8 15.2h5.4M13.8 18.6h5.4" fill="none" stroke="#3b76bf" stroke-width="1.5" stroke-linecap="round" />
+        </svg>
+        <span>教学文档协作平台</span>
+      </a>
+      <div id="topbar"></div>
+    </header>
+
+    <main class="container">
+      <header class="page-head">
+        <h1 id="pageTitle">话题详情</h1>
+        <p class="subtitle">下方按时间线展示全部发言，并自动汇总初步统一意见。</p>
+      </header>
+
+      <div id="detail"></div>
+
+      <div class="card" id="statementFormCard">
+        <h2 style="margin:0 0 14px;font-size:17px;color:var(--heading)">发表看法</h2>
+        <p class="muted" id="statementNotice" hidden></p>
+        <form id="statementForm" class="form-grid">
+          <div>
+            <label for="statementContent">发言内容</label>
+            <textarea id="statementContent" rows="4" maxlength="2000" required></textarea>
+          </div>
+          <div>
+            <label for="statementPosition">立场</label>
+            <select id="statementPosition">
+              <option value="agree">赞成</option>
+              <option value="disagree">反对</option>
+              <option value="neutral">中立</option>
+            </select>
+          </div>
+          <p class="muted">发言一经发表即保留记录，不能修改或删除。</p>
+          <button class="btn btn-primary" type="submit">发表</button>
+        </form>
+      </div>
+    </main>
+
+    <script src="qa.js"></script>
+  </body>
+</html>

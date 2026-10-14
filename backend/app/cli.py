@@ -9,7 +9,14 @@ from werkzeug.datastructures import FileStorage
 from werkzeug.security import generate_password_hash
 
 from . import db
-from .models import Document, DocumentCategory, DocumentVersion, User
+from .models import (
+    Document,
+    DocumentCategory,
+    DocumentVersion,
+    QaStatement,
+    QaTopic,
+    User,
+)
 
 
 DEMO_CATEGORIES = [
@@ -56,6 +63,39 @@ DEMO_ACCOUNTS = [
     ("teacher", "胡军成", "teacher", "teacher123"),
     ("viewer", "王老师", "teacher", "viewer123"),
 ]
+
+# 问答模块演示数据：一个已经形成初步统一意见，一个还在讨论中
+DEMO_QA_TOPICS = [
+    {
+        "title": "毕业设计要求是否增加中期检查",
+        "description": "讨论是否在毕业设计过程中增加一次中期检查，以及检查的时间点。",
+        "creator": "admin",
+        "status": "open",
+        "statements": [
+            ("teacher", "agree", "建议增加，能提前发现问题，避免最后集中返工。"),
+            ("other", "agree", "同意，中期检查放在第 8 周比较合适。"),
+            ("viewer", "agree", "支持，对过程管理有帮助。"),
+        ],
+    },
+    {
+        "title": "课程考核分析报告的提交时间是否调整",
+        "description": "讨论本学年课程考核分析报告的提交截止时间是否需要提前。",
+        "creator": "teacher",
+        "status": "open",
+        "statements": [
+            ("teacher", "agree", "建议提前到第 16 周，给后续汇总留时间。"),
+            ("other", "disagree", "第 18 周更稳妥，教师期末工作已经很多。"),
+            ("viewer", "neutral", "两种方案都行，最终以教务安排为准。"),
+        ],
+    },
+]
+
+DEMO_QA_STATEMENT_USERS = {
+    "admin": "admin",
+    "teacher": "teacher",
+    "other": "viewer",
+    "viewer": "viewer",
+}
 
 
 def _save_demo_file(app, stored_name, content):
@@ -121,6 +161,29 @@ def seed_demo_data(app):
             )
         )
 
+    for spec in DEMO_QA_TOPICS:
+        if QaTopic.query.filter_by(title=spec["title"]).first() is not None:
+            continue
+
+        topic = QaTopic(
+            title=spec["title"],
+            description=spec["description"],
+            creator=users[spec["creator"]],
+            status=spec["status"],
+        )
+        db.session.add(topic)
+        db.session.flush()
+
+        for username_key, position, content in spec["statements"]:
+            db.session.add(
+                QaStatement(
+                    topic=topic,
+                    author=users[DEMO_QA_STATEMENT_USERS[username_key]],
+                    position=position,
+                    content=content,
+                )
+            )
+
     db.session.commit()
 
 
@@ -132,6 +195,7 @@ def register_commands(app):
         print("Seed completed.")
         print("Accounts: admin/admin123, teacher/teacher123, viewer/viewer123")
         print("Documents: 3 (active / archived / deprecated)")
+        print("Q&A topics: 2 (one consensus reached, one under discussion)")
 
     @app.cli.command("demo-reset")
     @click.option("--yes", is_flag=True, help="Skip the confirmation prompt.")
@@ -178,6 +242,7 @@ def register_commands(app):
             )
         print("Accounts: admin/admin123, teacher/teacher123, viewer/viewer123")
         print("Documents: 3 (active / archived / deprecated)")
+        print("Q&A topics: 2 (one consensus reached, one under discussion)")
 
     @app.cli.command("wechat-check")
     def wechat_check():

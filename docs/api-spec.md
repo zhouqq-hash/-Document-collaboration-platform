@@ -264,3 +264,118 @@ changelog, file
 | PATCH /api/documents/{id} | 允许 | 403 | 403 |
 | POST /api/documents/{id}/versions | 允许 | 允许（仅本人负责） | 403 |
 | GET 版本/下载 | 允许 | 允许 | 允许 |
+
+## 问答接口
+
+Base URL 仍是 `/api`，问答接口统一挂在 `/api/qa` 前缀下。所有接口都需要登录，未登录返回 401。
+
+### GET /api/qa/topics?status=open
+
+返回话题列表，按最近活跃时间倒序。可选 `status=open|closed` 筛选。列表项字段：
+
+```json
+{
+  "data": [
+    {
+      "id": 1,
+      "title": "毕业设计要求是否增加中期检查",
+      "description": "讨论是否在毕业设计过程中增加一次中期检查。",
+      "status": "open",
+      "creator": { "id": 1, "username": "admin", "name": "管理员", "role": "admin" },
+      "created_at": "2026-10-12T02:00:00+00:00",
+      "updated_at": "2026-10-12T02:05:00+00:00",
+      "statement_count": 3,
+      "speaker_count": 2,
+      "latest_statement_at": "2026-10-12T02:05:00+00:00"
+    }
+  ]
+}
+```
+
+### POST /api/qa/topics
+
+任何已登录用户。请求：
+
+```json
+{ "title": "话题标题", "description": "话题说明（可选）", "ends_at": "2026-12-31T23:59:59Z" }
+```
+
+`ends_at` 可选，是定时结束时间（ISO 8601），必须是未来时间；不填则不自动结束。成功返回 201 和话题详情。标题为空返回 400 `invalid_title`；说明超长返回 400 `invalid_description`；结束时间格式错误或不是未来时间返回 400 `invalid_ends_at`。
+
+### GET /api/qa/topics/{id}
+
+返回话题详情，包含时间线（升序）和意见汇总：
+
+```json
+{
+  "data": {
+    "id": 1,
+    "title": "毕业设计要求是否增加中期检查",
+    "status": "open",
+    "ends_at": null,
+    "expired": false,
+    "creator": { "id": 1, "username": "admin", "name": "管理员", "role": "admin" },
+    "statements": [
+      {
+        "id": 1,
+        "topic_id": 1,
+        "content": "建议增加，能提前发现问题。",
+        "position": "agree",
+        "author": { "id": 2, "username": "teacher", "name": "胡军成", "role": "teacher" },
+        "created_at": "2026-10-12T02:01:00+00:00"
+      }
+    ],
+    "summary": {
+      "topic_id": 1,
+      "statement_count": 3,
+      "speaker_count": 2,
+      "positions": { "agree": 3, "disagree": 0, "neutral": 0 },
+      "dominant_position": "agree",
+      "dominant_count": 3,
+      "consensus_reached": true,
+      "consensus_position": "agree",
+      "summary_text": "初步统一意见：赞成（3/3）",
+      "latest_statement_at": "2026-10-12T02:05:00+00:00"
+    }
+  }
+}
+```
+
+### GET /api/qa/topics/{id}/summary
+
+只返回话题的意见汇总对象（与详情里的 `summary` 相同），便于单独轮询汇总结果。
+
+### POST /api/qa/topics/{id}/statements
+
+任何已登录用户。请求：
+
+```json
+{ "content": "发言内容", "position": "agree" }
+```
+
+- `content` 必填且 ≤ 2000 字，否则 400 `invalid_content`。
+- `position` 可选，取值 `agree` / `disagree` / `neutral`，不填默认 `neutral`，非法值返回 400 `invalid_position`。
+- 话题已结束时返回 409 `topic_closed`。
+
+成功返回 201 和新发言对象。
+
+### PATCH /api/qa/topics/{id}
+
+仅管理员或话题发起人。请求：
+
+```json
+{ "status": "closed", "ends_at": "2026-12-31T23:59:59Z" }
+```
+
+字段均可选：`status` 取值 `open` / `closed`，非法值返回 400 `invalid_status`；`ends_at` 设为 ISO 8601 未来时间可定时结束，设为 `null` 可清除定时。结束时间格式错误或不是未来时间返回 400 `invalid_ends_at`。其他人操作返回 403 `permission_denied`。
+
+## 问答权限映射
+
+| 接口 | 管理员 | 话题发起人 | 其他教师 |
+| --- | --- | --- | --- |
+| GET /api/qa/topics | 允许 | 允许 | 允许 |
+| POST /api/qa/topics | 允许 | 允许 | 允许 |
+| GET /api/qa/topics/{id} | 允许 | 允许 | 允许 |
+| GET /api/qa/topics/{id}/summary | 允许 | 允许 | 允许 |
+| POST /api/qa/topics/{id}/statements | 允许（话题未结束时） | 允许（话题未结束时） | 允许（话题未结束时） |
+| PATCH /api/qa/topics/{id} | 允许 | 允许 | 403 |

@@ -305,11 +305,11 @@
       <span class="topbar-note">业务方向 · 原型入口</span>
     </header>
 
-    <main class="container">
+    <main class="container" id="entryMain" style="display: none">
       <header class="page-head">
         <h1>原型入口</h1>
         <p class="subtitle">
-          当前演示文档管理模块原型：已经接入真实 Flask API，登录后可以查看分类、文档和历史版本，并上传、下载文件。
+          登录后进入模块入口：文档管理、问答管理两个模块原型均已接入真实 Flask API。
         </p>
       </header>
 
@@ -332,6 +332,25 @@
             <li>teacher / teacher123（负责人）、viewer / viewer123（普通教师）</li>
           </ul>
         </a>
+
+        <a class="card" href="qa/index.html">
+          <span class="tag tag-live">已接入 Flask API</span>
+          <h2>
+            <svg class="card-icon" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+              <rect width="32" height="32" rx="9" fill="#eef4fb" />
+              <path d="M7 9.5A1.5 1.5 0 0 1 8.5 8h15A1.5 1.5 0 0 1 25 9.5v8a1.5 1.5 0 0 1-1.5 1.5H16l-4.6 4.6v-4.6H8.5A1.5 1.5 0 0 1 7 17.5z" fill="#ffffff" stroke="#3b76bf" stroke-width="1.2" />
+              <path d="M11.5 12.5h9M11.5 16h5" stroke="#3b76bf" stroke-width="1.4" stroke-linecap="round" />
+            </svg>
+            <span>问答管理原型（qa）</span>
+          </h2>
+          <p>话题发起、时间线聚合发言、自动汇总初步统一意见、结束话题。</p>
+          <ul class="list">
+            <li>3 个页面，登录后才能访问</li>
+            <li>数据来自真实后端，需要先启动 <code>backend/run.py</code></li>
+            <li>演示账号与文档模块一致，所有教师都能发起和参与讨论</li>
+            <li>发言保留记录，不可修改或删除</li>
+          </ul>
+        </a>
       </div>
 
       <div class="note">
@@ -342,9 +361,29 @@
         </svg>
         <span>
           访问方式：先运行 <code>.\\.venv\\Scripts\\python.exe backend\\run.py</code>，再打开
-          <code>http://127.0.0.1:5000/</code> 回到本入口页，然后从上面的卡片进入文档管理原型。
+          <code>http://127.0.0.1:5000/</code>。未登录会先进入登录页，登录成功后回到本入口页，再从上面的卡片进入对应模块。
         </span>
       </div>
     </main>
+    <script>
+      // 入口页先校验登录：未登录去登录页，登录成功后带 next 回到这里
+      (function () {
+        var main = document.getElementById("entryMain");
+        function show() {
+          if (main) {
+            main.style.display = "";
+          }
+        }
+        fetch("/api/auth/me", { credentials: "same-origin" })
+          .then(function (res) {
+            if (res.status === 401) {
+              window.location.replace("/documents/index.html?next=/");
+              return;
+            }
+            show();
+          })
+          .catch(show);
+      })();
+    </script>
   </body>
 </html>

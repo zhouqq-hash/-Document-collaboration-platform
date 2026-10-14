@@ -42,6 +42,9 @@ class User(UserMixin, db.Model):
     uploaded_versions = db.relationship(
         "DocumentVersion", back_populates="uploader"
     )
+    # 用户与问答模块的关系
+    qa_topics = db.relationship("QaTopic", back_populates="creator")
+    qa_statements = db.relationship("QaStatement", back_populates="author")
 # 密码加密
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
@@ -172,5 +175,101 @@ class DocumentVersion(db.Model):
             "filename": self.filename,
             "changelog": self.changelog,
             "uploader": self.uploader.to_dict(),
+            "created_at": iso_utc(self.created_at),
+        }
+
+
+# 问答模块：话题表
+class QaTopic(db.Model):
+    __tablename__ = "qa_topics"
+
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(200), nullable=False)
+    description = db.Column(db.String(500), default="")
+    creator_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    # open：讨论中，closed：已结束，结束后不能再发言
+    status = db.Column(
+        db.String(16), nullable=False, default="open", server_default="open"
+    )
+    # 定时结束：到点后即使 status 仍是 open，也按已结束处理
+    ends_at = db.Column(db.DateTime, nullable=True)
+    created_at = db.Column(db.DateTime, default=utcnow, nullable=False)
+    updated_at = db.Column(
+        db.DateTime, default=utcnow, onupdate=utcnow, nullable=False
+    )
+
+    creator = db.relationship("User", back_populates="qa_topics")
+    statements = db.relationship(
+        "QaStatement",
+        back_populates="topic",
+        cascade="all, delete-orphan",
+        order_by="QaStatement.created_at.asc(), QaStatement.id.asc()",
+    )
+
+    @property
+    def is_expired(self):
+        if self.ends_at is None:
+            return False
+        ends = self.ends_at
+        if ends.tzinfo is None:
+            ends = ends.replace(tzinfo=timezone.utc)
+        return ends <= utcnow()
+
+    @property
+    def effective_status(self):
+        if self.status == "closed" or self.is_expired:
+            return "closed"
+        return "open"
+
+    def to_dict(self, include_statements=False, summary=None):
+        statements = self.statements
+        data = {
+            "id": self.id,
+            "title": self.title,
+            "description": self.description or "",
+            "status": self.effective_status,
+            "ends_at": iso_utc(self.ends_at),
+            "expired": self.is_expired,
+            "creator": self.creator.to_dict(),
+            "created_at": iso_utc(self.created_at),
+            "updated_at": iso_utc(self.updated_at),
+            "statement_count": len(statements),
+            "speaker_count": len({s.author_id for s in statements}),
+            "latest_statement_at": (
+                iso_utc(statements[-1].created_at) if statements else None
+            ),
+        }
+        if include_statements:
+            data["statements"] = [s.to_dict() for s in statements]
+            data["summary"] = summary or {}
+        return data
+
+
+# 问答模块：发言表（只增不改不删，保留发言人和时间记录）
+class QaStatement(db.Model):
+    __tablename__ = "qa_statements"
+
+    id = db.Column(db.Integer, primary_key=True)
+    topic_id = db.Column(
+        db.Integer, db.ForeignKey("qa_topics.id"), nullable=False, index=True
+    )
+    author_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    # 立场：agree 赞成 / disagree 反对 / neutral 中立
+    position = db.Column(
+        db.String(16), nullable=False, default="neutral", server_default="neutral"
+    )
+    content = db.Column(db.String(2000), nullable=False)
+    created_at = db.Column(db.DateTime, default=utcnow, nullable=False)
+
+    topic = db.relationship("QaTopic", back_populates="statements")
+    author = db.relationship("User", back_populates="qa_statements")
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "topic_id": self.topic_id,
+            "content": self.content,
+            "position": self.position,
+            "author": self.author.to_dict(),
             "created_at": iso_utc(self.created_at),
         }

@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>问答管理 · 教学文档协作平台</title>
+    <link rel="stylesheet" href="../documents/styles.css" />
+    <link rel="stylesheet" href="qa.css" />
+  </head>
+  <body data-page="topics">
+    <header class="topbar">
+      <a class="brand" href="index.html">
+        <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+          <defs>
+            <linearGradient id="brandMarkGradient" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="#4b86cf" />
+              <stop offset="100%" stop-color="#1f4473" />
+            </linearGradient>
+          </defs>
+          <rect width="32" height="32" rx="9" fill="url(#brandMarkGradient)" />
+          <path d="M12.2 7.5h6.1L22 11.2V23a1.6 1.6 0 0 1-1.6 1.6h-8.2A1.6 1.6 0 0 1 10.6 23V9.1A1.6 1.6 0 0 1 12.2 7.5Z" fill="#ffffff" />
+          <path d="M18.3 7.5 22 11.2h-3.7z" fill="#c9dcf3" />
+          <path d="M13.8 15.2h5.4M13.8 18.6h5.4" fill="none" stroke="#3b76bf" stroke-width="1.5" stroke-linecap="round" />
+        </svg>
+        <span>教学文档协作平台</span>
+      </a>
+      <div id="topbar"></div>
+    </header>
+
+    <main class="container">
+      <header class="page-head">
+        <h1>问答管理</h1>
+        <p class="subtitle">
+          发起话题讨论，按时间线聚合所有发言，自动汇总话题下的初步统一意见。
+        </p>
+      </header>
+
+      <div class="qa-toolbar">
+        <span class="muted">话题列表</span>
+        <a class="btn btn-primary" href="new-topic.html">发起话题</a>
+      </div>
+
+      <div class="card">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>话题</th>
+              <th>发起人</th>
+              <th>状态</th>
+              <th>发言数</th>
+              <th>参与人数</th>
+              <th>最近发言</th>
+            </tr>
+          </thead>
+          <tbody id="topicList"></tbody>
+        </table>
+      </div>
+    </main>
+
+    <script src="qa.js"></script>
+  </body>
+</html>

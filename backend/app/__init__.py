@@ -60,10 +60,11 @@ def create_app(config=None):
             401,
         )
 #注册业务模块
-    from . import auth, cli, documents, wechat
+    from . import auth, cli, documents, qa, wechat
 
     app.register_blueprint(auth.bp)
     app.register_blueprint(documents.bp)
+    app.register_blueprint(qa.bp)
     app.register_blueprint(wechat.bp)
     cli.register_commands(app)
 #健康检查接口

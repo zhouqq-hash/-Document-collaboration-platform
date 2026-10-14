@@ -4,6 +4,10 @@ Flask-Migrate==4.1.0
 Flask-Login==0.6.3
 pytest==9.1.1
 requests==2.34.2
+# 文档正文解析（AI 问答 / 自动预审要读文件内容）
+pdfplumber==0.11.10
+python-docx==1.2.0
+openpyxl==3.1.5
 
 # 腾讯云 COS 的依赖单独放在 requirements-cos.txt：
 # 默认用本地存储 backend/media/，用不到 COS；它会拉一个需要编译的 crcmod，

@@ -1,6 +1,6 @@
 # 教学文档协作平台
 
-当前仓库先实现“文档管理模块”，采用 Flask JSON API + 静态前端原型。
+当前仓库已实现“文档管理模块”和“问答管理模块”，采用 Flask JSON API + 静态前端原型。
 
 ## 目录
 
@@ -86,6 +86,7 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned
 | 原型 | 入口 | 说明 |
 | --- | --- | --- |
 | 文档管理模块原型 | `http://127.0.0.1:5000/documents/index.html` | 已接入真实 API，必须先启动后端 |
+| 问答管理模块原型 | `http://127.0.0.1:5000/qa/index.html` | 已接入真实 API，话题发起 / 时间线聚合 / 意见汇总 |
 
 先启动后端：
 
@@ -93,7 +94,7 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned
 .\.venv\Scripts\python.exe backend\run.py
 ```
 
-再打开 `http://127.0.0.1:5000/`，从入口页进入。文档管理原型的页面不能直接双击打开，因为 `file://` 方式无法调用 Flask API。
+再打开 `http://127.0.0.1:5000/`，未登录会先进入登录页，登录成功后回到模块入口页，再选择进入文档管理或问答管理。原型页面不能直接双击打开，因为 `file://` 方式无法调用 Flask API。
 
 ## 常见问题
 

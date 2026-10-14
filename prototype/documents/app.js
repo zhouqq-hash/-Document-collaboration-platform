@@ -4,6 +4,15 @@ function qs(name) {
   return new URLSearchParams(window.location.search).get(name);
 }
 
+// 登录成功后要回哪里：优先用 ?next= 里的站内路径，防止被拼成外链
+function safeNextUrl() {
+  const next = qs("next");
+  if (next && next.startsWith("/") && !next.startsWith("//") && !next.includes("\\")) {
+    return next;
+  }
+  return "categories.html";
+}
+
 function escapeHtml(value) {
   return String(value ?? "")
     .replaceAll("&", "&amp;")
@@ -486,7 +495,7 @@ async function initWechatLogin() {
           { method: "POST", body: JSON.stringify({ openid, nickname }) },
           { redirectOn401: false }
         );
-        window.location.href = "categories.html";
+        window.location.href = safeNextUrl();
       } catch (error) {
         showLoginNotice(error.message);
         button.disabled = false;
@@ -533,7 +542,7 @@ async function initWechatLogin() {
       startWechatPolling({
         check: () => true,
         onSuccess: () => {
-          window.location.href = "categories.html";
+          window.location.href = safeNextUrl();
         },
         onTimeout: () => {
           button.disabled = false;
@@ -551,7 +560,7 @@ async function initLogin() {
     // 已经有会话时直接进系统，别让人重复登录
     try {
       await getCurrentUser();
-      window.location.href = "categories.html";
+      window.location.href = safeNextUrl();
       return;
     } catch (_) {
       // 未登录，继续走登录流程
@@ -585,7 +594,7 @@ async function initLogin() {
         },
         { redirectOn401: false }
       );
-      window.location.href = "categories.html";
+      window.location.href = safeNextUrl();
     } catch (error) {
       showLoginNotice(error.message);
     } finally {
@@ -826,7 +835,7 @@ window.addEventListener("message", (event) => {
     return;
   }
   if (data.status === "success") {
-    window.location.href = "categories.html";
+    window.location.href = safeNextUrl();
   } else {
     showLoginNotice(data.message || "微信登录失败");
   }

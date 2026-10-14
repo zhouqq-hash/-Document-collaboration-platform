@@ -14,7 +14,8 @@ def env_int(name, default):
 
 
 class Config:
-    SECRET_KEY = "dev-secret-change-me"
+    # 生产环境（Render 等）用环境变量覆盖；没设时保留开发用的默认值
+    SECRET_KEY = os.environ.get("SECRET_KEY", "dev-secret-change-me")
     SQLALCHEMY_DATABASE_URI = "sqlite:///" + str(
         BASE_DIR / "instance" / "doc_collab.db"
     ).replace("\\", "/")
@@ -26,6 +27,15 @@ class Config:
     COS_SECRET_KEY = os.environ.get("COS_SECRET_KEY")
     COS_REGION = os.environ.get("COS_REGION")
     COS_BUCKET = os.environ.get("COS_BUCKET")
+    # Cosmos 模型推理平台（OpenAI 兼容接口）：AI 问答和自动预审都走这里
+    COSMOS_API_BASE = os.environ.get(
+        "COSMOS_API_BASE", "https://cosmos.datapower.top/v1"
+    ).rstrip("/")
+    COSMOS_API_KEY = os.environ.get("COSMOS_API_KEY", "")
+    COSMOS_MODEL = os.environ.get("COSMOS_MODEL", "deepseek-v4-flash-0731")
+    # 问答要等模型写完答案，预审要读多份文档，所以超时分开设
+    COSMOS_QA_TIMEOUT = env_int("COSMOS_QA_TIMEOUT", 120)
+    COSMOS_REVIEW_TIMEOUT = env_int("COSMOS_REVIEW_TIMEOUT", 180)
     # 微信登录：配好 APP_ID / APP_SECRET 走真实微信接口，没配就进演示模式
     WECHAT_APP_ID = os.environ.get("WECHAT_APP_ID", "")
     WECHAT_APP_SECRET = os.environ.get("WECHAT_APP_SECRET", "")
