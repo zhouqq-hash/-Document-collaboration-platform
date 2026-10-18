@@ -311,6 +311,10 @@ function renderTopbar(user) {
     : "";
   document.querySelectorAll("#topbar").forEach((node) => {
     node.innerHTML = `
+      <nav class="admin-nav">
+        <a href="/">工作台</a>
+        <a href="../qa/index.html">问答话题</a>
+      </nav>
       ${adminNav}
       <nav class="admin-nav"><a href="account.html">账号设置</a></nav>
       <span class="user-pill">${avatar}${escapeHtml(user.name)} · ${
@@ -974,6 +978,104 @@ async function initDocumentDetail() {
         </div>
       </div>
     `;
+
+    // 与问答模块打通：话题里回写到本文档的最终结论
+    const decisionSection = document.createElement("section");
+    decisionSection.className = "card";
+    decisionSection.innerHTML = `
+      <div class="card-head">
+        <h2>文档决议</h2>
+      </div>
+      <div id="documentDecisions" class="muted">加载中…</div>
+    `;
+    container.appendChild(decisionSection);
+
+    try {
+      const decisions = await apiRequest(`/api/qa/decisions?document_id=${doc.id}`);
+      const list = document.getElementById("documentDecisions");
+      list.classList.remove("muted");
+      list.innerHTML = decisions.length
+        ? `<ul class="decision-list">${decisions
+            .map(
+              (item) => `
+                <li class="decision-item">
+                  <div class="decision-head">
+                    <a href="../qa/topic.html?id=${item.topic_id}">${escapeHtml(
+                      item.topic_title
+                    )}</a>
+                    <span class="decision-meta">${escapeHtml(
+                      item.by ? item.by.name : "未知"
+                    )} · ${formatTime(item.at)}</span>
+                  </div>
+                  <p class="decision-text">${escapeHtml(item.conclusion)}</p>
+                </li>
+              `
+            )
+            .join("")}</ul>`
+        : '<span class="muted">还没有回写的结论。讨论出结果后，在话题详情页补录结论并勾选回写即可。</span>';
+    } catch (error) {
+      document.getElementById(
+        "documentDecisions"
+      ).innerHTML = `<span class="notice">${escapeHtml(error.message)}</span>`;
+    }
+
+    // 与问答模块打通：反向展示关联到该文档的话题
+    const discussionSection = document.createElement("section");
+    discussionSection.className = "card";
+    discussionSection.innerHTML = `
+      <div class="card-head">
+        <h2>相关讨论</h2>
+        <a class="btn btn-outline btn-sm" href="../qa/new-topic.html?document_id=${doc.id}">发起讨论</a>
+      </div>
+      <div id="documentTopics" class="muted">加载中…</div>
+    `;
+    container.appendChild(discussionSection);
+
+    try {
+      const topicResult = await apiRequest(
+        `/api/qa/topics?document_id=${doc.id}&page_size=50`
+      );
+      const topics = topicResult.items || [];
+      const list = document.getElementById("documentTopics");
+      list.innerHTML = topics.length
+        ? `
+          <table class="table">
+            <thead>
+              <tr>
+                <th>话题</th>
+                <th>发起人</th>
+                <th>状态</th>
+                <th>发言数</th>
+                <th>最近发言</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${topics
+                .map(
+                  (topic) => `
+                    <tr>
+                      <td><a href="../qa/topic.html?id=${topic.id}">${escapeHtml(
+                        topic.title
+                      )}</a></td>
+                      <td>${escapeHtml(topic.creator.name)}</td>
+                      <td>${topic.status === "open" ? "讨论中" : "已结束"}</td>
+                      <td>${topic.statement_count}</td>
+                      <td>${formatTime(
+                        topic.latest_statement_at || topic.updated_at
+                      )}</td>
+                    </tr>
+                  `
+                )
+                .join("")}
+            </tbody>
+          </table>
+        `
+        : '<span class="muted">还没有关联的讨论，点右上角「发起讨论」创建一个。</span>';
+    } catch (error) {
+      document.getElementById(
+        "documentTopics"
+      ).innerHTML = `<span class="notice">${escapeHtml(error.message)}</span>`;
+    }
   } catch (error) {
     showPageMessage("detail", error.message, true);
   }

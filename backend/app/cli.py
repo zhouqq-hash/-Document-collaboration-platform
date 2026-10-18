@@ -15,6 +15,9 @@ from .models import (
     DocumentVersion,
     QaStatement,
     QaTopic,
+    QaTopicCategory,
+    Table,
+    TableVersion,
     User,
 )
 
@@ -69,6 +72,7 @@ DEMO_QA_TOPICS = [
     {
         "title": "毕业设计要求是否增加中期检查",
         "description": "讨论是否在毕业设计过程中增加一次中期检查，以及检查的时间点。",
+        "category": "毕业设计",
         "creator": "admin",
         "status": "open",
         "statements": [
@@ -80,6 +84,8 @@ DEMO_QA_TOPICS = [
     {
         "title": "课程考核分析报告的提交时间是否调整",
         "description": "讨论本学年课程考核分析报告的提交截止时间是否需要提前。",
+        "category": "课程考核",
+        "document": "2025-2026学年课程考核分析报告",
         "creator": "teacher",
         "status": "open",
         "statements": [
@@ -90,12 +96,33 @@ DEMO_QA_TOPICS = [
     },
 ]
 
+DEMO_QA_CATEGORIES = [
+    "教学安排",
+    "课程考核",
+    "毕业设计",
+    "其他",
+]
+
 DEMO_QA_STATEMENT_USERS = {
     "admin": "admin",
     "teacher": "teacher",
     "other": "viewer",
     "viewer": "viewer",
 }
+
+# 表格协作模块演示数据：一张带示例行列的进度表，方便直接演示行内编辑与回滚
+DEMO_TABLES = [
+    {
+        "name": "2026届毕业设计进度表",
+        "description": "用于跟踪各组毕业设计选题与进度的协作表格。",
+        "owner": "teacher",
+        "columns": ["组号", "题目", "成员", "进度"],
+        "rows": [
+            {"cells": {"组号": "1", "题目": "在线文档协作平台", "成员": "张三、李四", "进度": "需求分析"}},
+            {"cells": {"组号": "2", "题目": "教学问答系统", "成员": "王五", "进度": "原型设计"}},
+        ],
+    },
+]
 
 
 def _save_demo_file(app, stored_name, content):
@@ -133,54 +160,103 @@ def seed_demo_data(app):
             db.session.add(category)
         categories[name] = category
 
+    qa_categories = {}
+    for order, name in enumerate(DEMO_QA_CATEGORIES):
+        category = QaTopicCategory.query.filter_by(name=name).first()
+        if category is None:
+            category = QaTopicCategory(name=name, sort_order=order)
+            db.session.add(category)
+        qa_categories[name] = category
+
     db.session.flush()
 
+    demo_documents = {}
     for spec in DEMO_DOCUMENTS:
-        if Document.query.filter_by(title=spec["title"]).first() is not None:
-            continue
-
-        owner = users[spec["owner"]]
-        document = Document(
-            title=spec["title"],
-            category=categories[spec["category"]],
-            owner=owner,
-            status=spec["status"],
-        )
-        db.session.add(document)
-        db.session.flush()
-
-        _save_demo_file(app, spec["stored_name"], spec["content"])
-        db.session.add(
-            DocumentVersion(
-                document=document,
-                version_number=1,
-                filename=spec["filename"],
-                file_path=spec["stored_name"],
-                changelog="初始版本",
-                uploader=owner,
+        document = Document.query.filter_by(title=spec["title"]).first()
+        if document is None:
+            owner = users[spec["owner"]]
+            document = Document(
+                title=spec["title"],
+                category=categories[spec["category"]],
+                owner=owner,
+                status=spec["status"],
             )
-        )
+            db.session.add(document)
+            db.session.flush()
+
+            _save_demo_file(app, spec["stored_name"], spec["content"])
+            db.session.add(
+                DocumentVersion(
+                    document=document,
+                    version_number=1,
+                    filename=spec["filename"],
+                    file_path=spec["stored_name"],
+                    changelog="初始版本",
+                    uploader=owner,
+                )
+            )
+        demo_documents[spec["title"]] = document
 
     for spec in DEMO_QA_TOPICS:
-        if QaTopic.query.filter_by(title=spec["title"]).first() is not None:
-            continue
+        topic = QaTopic.query.filter_by(title=spec["title"]).first()
+        if topic is None:
+            topic = QaTopic(
+                title=spec["title"],
+                description=spec["description"],
+                creator=users[spec["creator"]],
+                category=qa_categories[spec["category"]],
+                document=demo_documents.get(spec.get("document")),
+                status=spec["status"],
+            )
+            db.session.add(topic)
+            db.session.flush()
 
-        topic = QaTopic(
-            title=spec["title"],
-            description=spec["description"],
-            creator=users[spec["creator"]],
-            status=spec["status"],
-        )
-        db.session.add(topic)
-        db.session.flush()
+            for username_key, position, content in spec["statements"]:
+                db.session.add(
+                    QaStatement(
+                        topic=topic,
+                        author=users[DEMO_QA_STATEMENT_USERS[username_key]],
+                        position=position,
+                        content=content,
+                    )
+                )
+        else:
+            if topic.category_id is None:
+                topic.category = qa_categories[spec["category"]]
+            if topic.document_id is None:
+                topic.document = demo_documents.get(spec.get("document"))
 
-        for username_key, position, content in spec["statements"]:
+    for spec in DEMO_TABLES:
+        table = Table.query.filter_by(name=spec["name"]).first()
+        if table is None:
+            columns = [
+                {"key": f"col{index + 1}", "name": name, "type": "text"}
+                for index, name in enumerate(spec["columns"])
+            ]
+            rows = []
+            for index, row_spec in enumerate(spec["rows"]):
+                cells = {}
+                for col_index, name in enumerate(spec["columns"]):
+                    cells[f"col{col_index + 1}"] = row_spec["cells"].get(name, "")
+                rows.append({"row_key": f"r{index + 1}", "cells": cells})
+            table = Table(
+                name=spec["name"],
+                description=spec["description"],
+                owner=users[spec["owner"]],
+                columns=columns,
+                rows=rows,
+                row_seq=len(rows),
+                version_number=1,
+            )
+            db.session.add(table)
+            db.session.flush()
             db.session.add(
-                QaStatement(
-                    topic=topic,
-                    author=users[DEMO_QA_STATEMENT_USERS[username_key]],
-                    position=position,
-                    content=content,
+                TableVersion(
+                    table=table,
+                    version_number=1,
+                    snapshot={"columns": columns, "rows": rows},
+                    changelog="创建表格",
+                    editor=users[spec["owner"]],
                 )
             )
 
@@ -196,6 +272,7 @@ def register_commands(app):
         print("Accounts: admin/admin123, teacher/teacher123, viewer/viewer123")
         print("Documents: 3 (active / archived / deprecated)")
         print("Q&A topics: 2 (one consensus reached, one under discussion)")
+        print("Tables: 1 (graduation project progress)")
 
     @app.cli.command("demo-reset")
     @click.option("--yes", is_flag=True, help="Skip the confirmation prompt.")
@@ -243,6 +320,7 @@ def register_commands(app):
         print("Accounts: admin/admin123, teacher/teacher123, viewer/viewer123")
         print("Documents: 3 (active / archived / deprecated)")
         print("Q&A topics: 2 (one consensus reached, one under discussion)")
+        print("Tables: 1 (graduation project progress)")
 
     @app.cli.command("wechat-check")
     def wechat_check():

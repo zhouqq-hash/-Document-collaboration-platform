@@ -44,6 +44,24 @@
             <textarea id="description" name="description" rows="4" maxlength="500"></textarea>
           </div>
           <div>
+            <label for="category">话题分类</label>
+            <select id="category" name="category_id">
+              <option value="">未分类</option>
+            </select>
+          </div>
+          <div>
+            <label for="relatedDocument">关联文档（可选）</label>
+            <select id="relatedDocument" name="document_id">
+              <option value="">不关联文档</option>
+            </select>
+          </div>
+          <div id="relatedVersionWrap" hidden>
+            <label for="relatedVersion">关联版本（可选）</label>
+            <select id="relatedVersion" name="version_id">
+              <option value="">不指定版本</option>
+            </select>
+          </div>
+          <div>
             <label for="endsAt">结束时间（可选）</label>
             <input id="endsAt" name="ends_at" type="datetime-local" />
           </div>

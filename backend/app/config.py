@@ -36,6 +36,8 @@ class Config:
     # 问答要等模型写完答案，预审要读多份文档，所以超时分开设
     COSMOS_QA_TIMEOUT = env_int("COSMOS_QA_TIMEOUT", 120)
     COSMOS_REVIEW_TIMEOUT = env_int("COSMOS_REVIEW_TIMEOUT", 180)
+    # AI 摘要走页面交互，等待时间要明显短于问答，避免用户干等
+    COSMOS_SUMMARY_TIMEOUT = env_int("COSMOS_SUMMARY_TIMEOUT", 30)
     # 微信登录：配好 APP_ID / APP_SECRET 走真实微信接口，没配就进演示模式
     WECHAT_APP_ID = os.environ.get("WECHAT_APP_ID", "")
     WECHAT_APP_SECRET = os.environ.get("WECHAT_APP_SECRET", "")

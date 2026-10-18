@@ -1058,3 +1058,72 @@ td.notice::before {
     transition-duration: 0.001ms !important;
   }
 }
+
+/* 卡片标题行：标题在左，操作按钮靠右 */
+.card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.card-head h2 {
+  margin: 0;
+}
+
+/* 小尺寸按钮 */
+.btn-sm {
+  padding: 5px 10px;
+  font-size: 13px;
+}
+
+/* 文档决议：由问答话题回写的最终结论 */
+.decision-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.decision-item {
+  padding: 12px 0;
+  border-top: 1px solid var(--border);
+}
+
+.decision-item:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.decision-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+
+.decision-head a {
+  color: var(--text);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.decision-head a:hover {
+  color: var(--brand-700);
+}
+
+.decision-meta {
+  flex: none;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.decision-text {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.8;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--text);
+}

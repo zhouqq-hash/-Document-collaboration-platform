@@ -88,6 +88,20 @@ python -m pytest tests -q
 | GET | `/api/documents/{id}/versions` | 历史版本 |
 | POST | `/api/documents/{id}/versions` | 上传新版本 |
 | GET | `/api/documents/{id}/versions/{version_id}/download` | 下载版本 |
+| GET | `/api/tables` | 表格列表，`?q=` 按名称/说明搜索 |
+| POST | `/api/tables` | 新建表格（列名数组或对象数组） |
+| GET | `/api/tables/{id}` | 表格详情（含行列与 `can_manage`） |
+| PATCH | `/api/tables/{id}` | 修改表格名称/说明，仅创建者或管理员 |
+| DELETE | `/api/tables/{id}` | 删除表格，仅创建者或管理员 |
+| PATCH | `/api/tables/{id}/cells` | 行内编辑单元格并记录修改 |
+| POST | `/api/tables/{id}/rows` | 新增一行 |
+| DELETE | `/api/tables/{id}/rows/{row_key}` | 删除一行，仅创建者或管理员 |
+| POST | `/api/tables/{id}/columns` | 新增一列（自动生成新版本） |
+| GET | `/api/tables/{id}/changes` | 修改记录 |
+| GET | `/api/tables/{id}/versions` | 版本列表 |
+| POST | `/api/tables/{id}/versions` | 保存快照，仅创建者或管理员 |
+| GET | `/api/tables/{id}/versions/{version_id}` | 版本详情（含完整快照） |
+| POST | `/api/tables/{id}/versions/{version_id}/rollback` | 回滚到指定版本，仅创建者或管理员 |
 
 ## 微信登录配置
 

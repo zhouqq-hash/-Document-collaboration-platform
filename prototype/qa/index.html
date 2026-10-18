@@ -40,11 +40,33 @@
         <a class="btn btn-primary" href="new-topic.html">发起话题</a>
       </div>
 
+      <div id="topicFilterHint"></div>
+
+      <div class="qa-filters card">
+        <input id="searchInput" type="search" placeholder="搜索话题标题、说明或发言内容" />
+        <select id="categoryFilter" aria-label="按分类筛选">
+          <option value="">全部分类</option>
+          <option value="none">未分类</option>
+        </select>
+        <select id="statusFilter" aria-label="按状态筛选">
+          <option value="">全部状态</option>
+          <option value="open">讨论中</option>
+          <option value="closed">已结束</option>
+        </select>
+        <select id="sortFilter" aria-label="排序方式">
+          <option value="latest">最近活跃</option>
+          <option value="created">最新发起</option>
+        </select>
+        <button class="btn btn-outline" id="resetFilters" type="button">重置</button>
+      </div>
+
       <div class="card">
         <table class="table">
           <thead>
             <tr>
               <th>话题</th>
+              <th>分类</th>
+              <th>关联文档</th>
               <th>发起人</th>
               <th>状态</th>
               <th>发言数</th>
@@ -55,6 +77,8 @@
           <tbody id="topicList"></tbody>
         </table>
       </div>
+
+      <div class="qa-pager" id="topicPager"></div>
     </main>
 
     <script src="qa.js"></script>

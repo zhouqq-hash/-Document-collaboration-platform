@@ -39,6 +39,13 @@
         <h2 style="margin:0 0 14px;font-size:17px;color:var(--heading)">发表看法</h2>
         <p class="muted" id="statementNotice" hidden></p>
         <form id="statementForm" class="form-grid">
+          <div id="replyContext" class="reply-context" hidden>
+            <div class="reply-context-head">
+              <span id="replyContextText"></span>
+              <button class="btn btn-outline btn-sm" id="cancelReplyButton" type="button">取消回复</button>
+            </div>
+            <blockquote id="quotePreview" class="quote-preview" hidden></blockquote>
+          </div>
           <div>
             <label for="statementContent">发言内容</label>
             <textarea id="statementContent" rows="4" maxlength="2000" required></textarea>

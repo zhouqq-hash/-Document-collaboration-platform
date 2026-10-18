@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>表格协作 · 教学文档协作平台</title>
+    <link rel="stylesheet" href="tables.css" />
+  </head>
+  <body data-page="tables">
+    <header class="topbar">
+      <a class="brand" href="/index.html">
+        <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+          <defs>
+            <linearGradient id="brandMarkGradient" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="#4b86cf" />
+              <stop offset="100%" stop-color="#1f4473" />
+            </linearGradient>
+          </defs>
+          <rect width="32" height="32" rx="9" fill="url(#brandMarkGradient)" />
+          <path d="M12.2 7.5h6.1L22 11.2V23a1.6 1.6 0 0 1-1.6 1.6h-8.2A1.6 1.6 0 0 1 10.6 23V9.1A1.6 1.6 0 0 1 12.2 7.5Z" fill="#ffffff" />
+          <path d="M18.3 7.5 22 11.2h-3.7z" fill="#c9dcf3" />
+          <path d="M13.8 15.2h5.4M13.8 18.6h5.4" fill="none" stroke="#3b76bf" stroke-width="1.5" stroke-linecap="round" />
+        </svg>
+        <span>教学文档协作平台</span>
+      </a>
+      <div id="topbar"></div>
+    </header>
+
+    <main class="container">
+      <header class="page-head">
+        <div class="head-actions" style="justify-content: space-between">
+          <div>
+            <h1>表格协作</h1>
+            <p class="subtitle">多人共同维护表格，行内编辑自动留痕，关键状态可保存快照并一键回滚。</p>
+          </div>
+          <button class="btn btn-primary" id="createButton" type="button">新建表格</button>
+        </div>
+      </header>
+
+      <div id="tableList" class="grid-list"></div>
+    </main>
+
+    <div class="dialog-backdrop" id="createDialog" hidden>
+      <div class="dialog">
+        <h2>新建表格</h2>
+        <form class="form-grid" id="createForm">
+          <div>
+            <label for="tableName">表格名称</label>
+            <input id="tableName" name="name" placeholder="例如：2026届毕业设计进度表" required />
+          </div>
+          <div>
+            <label for="tableDescription">表格说明（可选）</label>
+            <textarea id="tableDescription" name="description" rows="2" placeholder="这张表格用来做什么"></textarea>
+          </div>
+          <div>
+            <label for="tableColumns">列名</label>
+            <input id="tableColumns" name="columns" placeholder="用顿号、逗号或空格分隔，例如：组号、题目、进度" required />
+            <p class="hint">列名之间用「、」「，」「,」或空格分隔。</p>
+          </div>
+          <div class="dialog-actions">
+            <button class="btn btn-ghost" id="cancelCreate" type="button">取消</button>
+            <button class="btn btn-primary" type="submit">创建</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div id="toastBox"></div>
+    <script src="tables.js"></script>
+    <script>
+      (async function init() {
+        try {
+          const user = await getCurrentUser();
+          renderTopbar(user);
+          await renderTables();
+        } catch (error) {
+          toast(error.message, "error");
+        }
+
+        document.getElementById("createButton").addEventListener("click", () => {
+          document.getElementById("createDialog").hidden = false;
+          document.getElementById("tableName").focus();
+        });
+        document.getElementById("cancelCreate").addEventListener("click", () => {
+          document.getElementById("createDialog").hidden = true;
+        });
+        document.getElementById("createForm").addEventListener("submit", onCreate);
+      })();
+
+      function parseColumns(text) {
+        return String(text || "")
+          .split(/[，,、\s]+/)
+          .map((item) => item.trim())
+          .filter(Boolean);
+      }
+
+      async function renderTables() {
+        const listNode = document.getElementById("tableList");
+        let tables = [];
+        try {
+          tables = await apiRequest("/api/tables");
+        } catch (error) {
+          listNode.innerHTML = `<div class="card empty">${escapeHtml(error.message)}</div>`;
+          return;
+        }
+        if (!tables.length) {
+          listNode.innerHTML = `<div class="card empty">还没有表格，点右上角「新建表格」开始协作。</div>`;
+          return;
+        }
+        listNode.innerHTML = tables
+          .map(
+            (table) => `
+              <a class="card table-card" href="table.html?id=${table.id}">
+                <h2>${escapeHtml(table.name)}</h2>
+                <p>${escapeHtml(table.description || "暂无说明")}</p>
+                <div class="meta">
+                  ${table.column_count} 列 · ${table.row_count} 行 · 版本 ${table.version_number}
+                  · 负责人 ${escapeHtml(table.owner?.name || "")}
+                </div>
+                <div class="meta">更新于 ${formatTime(table.updated_at)}</div>
+              </a>
+            `
+          )
+          .join("");
+      }
+
+      async function onCreate(event) {
+        event.preventDefault();
+        const columns = parseColumns(document.getElementById("tableColumns").value);
+        if (!columns.length) {
+          toast("请至少填写一列", "error");
+          return;
+        }
+        const payload = {
+          name: document.getElementById("tableName").value.trim(),
+          description: document.getElementById("tableDescription").value.trim(),
+          columns,
+        };
+        try {
+          const table = await apiRequest("/api/tables", {
+            method: "POST",
+            body: JSON.stringify(payload),
+          });
+          window.location.href = `table.html?id=${table.id}`;
+        } catch (error) {
+          toast(error.message, "error");
+        }
+      }
+    </script>
+  </body>
+</html>

@@ -53,6 +53,11 @@ def _api_key():
     return key
 
 
+def is_configured():
+    """是否配了 API Key。没配时调用会直接报错，界面据此做降级提示。"""
+    return bool(_setting("COSMOS_API_KEY", ""))
+
+
 def _timeout(name, fallback):
     try:
         return int(_setting(name, fallback))

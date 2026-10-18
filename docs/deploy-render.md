@@ -72,6 +72,7 @@ Environment 里补：
 | `COSMOS_API_KEY` | 你的模型平台密钥 |
 | `COSMOS_API_BASE` | 非默认接口才需要，默认 `https://cosmos.datapower.top/v1` |
 | `COSMOS_MODEL` | 非默认模型才需要 |
+| `COSMOS_SUMMARY_TIMEOUT` | 问答模块 AI 摘要的等待秒数，默认 30，一般不用改 |
 
 ## 五、日常更新
 

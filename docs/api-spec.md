@@ -269,26 +269,44 @@ changelog, file
 
 Base URL 仍是 `/api`，问答接口统一挂在 `/api/qa` 前缀下。所有接口都需要登录，未登录返回 401。
 
-### GET /api/qa/topics?status=open
+### GET /api/qa/topics
 
-返回话题列表，按最近活跃时间倒序。可选 `status=open|closed` 筛选。列表项字段：
+返回话题列表，默认按最近活跃时间倒序。可选查询参数：
+
+- `status=open|closed`：按状态筛选；
+- `category_id=<id>`：按分类筛选；`category_id=none` 只看未分类；
+- `document_id=<id>`：只返回关联到该文档的话题；
+- `q=<关键词>`：搜索标题、说明或任意发言内容；
+- `sort=latest|created`：`latest` 最近活跃（默认），`created` 最新发起；
+- `page` / `page_size`：分页，默认第 1 页、每页 20 条，`page_size` 上限 100（超限按 100 处理，非法 `page` 回落到第 1 页）。
+
+`status` 只接受 `open` / `closed`，其他值返回 400 `invalid_status`。分页信息在 `data` 里一并返回，列表项在 `items` 中（含 `category`、`document`、`version`，未设置时为 `null`）：
 
 ```json
 {
-  "data": [
-    {
+  "data": {
+    "items": [
+      {
       "id": 1,
       "title": "毕业设计要求是否增加中期检查",
       "description": "讨论是否在毕业设计过程中增加一次中期检查。",
       "status": "open",
+      "category": { "id": 3, "name": "毕业设计" },
+      "document": { "id": 3, "title": "2025-2026学年课程考核分析报告", "status": "deprecated" },
+      "version": { "id": 5, "version_number": 1, "filename": "考核分析报告_v1.txt" },
       "creator": { "id": 1, "username": "admin", "name": "管理员", "role": "admin" },
       "created_at": "2026-10-12T02:00:00+00:00",
       "updated_at": "2026-10-12T02:05:00+00:00",
       "statement_count": 3,
       "speaker_count": 2,
       "latest_statement_at": "2026-10-12T02:05:00+00:00"
-    }
-  ]
+      }
+    ],
+    "total": 12,
+    "page": 1,
+    "page_size": 20,
+    "total_pages": 1
+  }
 }
 ```
 
@@ -297,10 +315,10 @@ Base URL 仍是 `/api`，问答接口统一挂在 `/api/qa` 前缀下。所有�
 任何已登录用户。请求：
 
 ```json
-{ "title": "话题标题", "description": "话题说明（可选）", "ends_at": "2026-12-31T23:59:59Z" }
+{ "title": "话题标题", "description": "话题说明（可选）", "category_id": 3, "document_id": 3, "version_id": 5, "ends_at": "2026-12-31T23:59:59Z" }
 ```
 
-`ends_at` 可选，是定时结束时间（ISO 8601），必须是未来时间；不填则不自动结束。成功返回 201 和话题详情。标题为空返回 400 `invalid_title`；说明超长返回 400 `invalid_description`；结束时间格式错误或不是未来时间返回 400 `invalid_ends_at`。
+`category_id` 可选，话题所属分类的 id；分类不存在返回 404 `category_not_found`。`document_id` / `version_id` 可选，用于关联文档及其版本；文档不存在返回 404 `document_not_found`，版本不存在返回 404 `version_not_found`，版本不属于所选文档返回 400 `version_mismatch`；只传 `version_id` 时自动推导所属文档。`ends_at` 可选，是定时结束时间（ISO 8601），必须是未来时间；不填则不自动结束。成功返回 201 和话题详情。标题为空返回 400 `invalid_title`；说明超长返回 400 `invalid_description`；结束时间格式错误或不是未来时间返回 400 `invalid_ends_at`。
 
 ### GET /api/qa/topics/{id}
 
@@ -312,6 +330,20 @@ Base URL 仍是 `/api`，问答接口统一挂在 `/api/qa` 前缀下。所有�
     "id": 1,
     "title": "毕业设计要求是否增加中期检查",
     "status": "open",
+    "category": { "id": 3, "name": "毕业设计" },
+    "document": { "id": 3, "title": "2025-2026学年课程考核分析报告", "status": "deprecated" },
+    "version": { "id": 5, "version_number": 1, "filename": "考核分析报告_v1.txt" },
+    "ai_summary": {
+      "text": "## 讨论概况\n...",
+      "generated_at": "2026-10-16T07:30:00+00:00",
+      "stale": false
+    },
+    "conclusion": {
+      "text": "经讨论决定：提交截止时间提前到第 16 周。",
+      "by": { "id": 2, "username": "teacher", "name": "胡军成", "role": "teacher" },
+      "at": "2026-10-16T08:08:00+00:00",
+      "shared": true
+    },
     "ends_at": null,
     "expired": false,
     "creator": { "id": 1, "username": "admin", "name": "管理员", "role": "admin" },
@@ -322,7 +354,15 @@ Base URL 仍是 `/api`，问答接口统一挂在 `/api/qa` 前缀下。所有�
         "content": "建议增加，能提前发现问题。",
         "position": "agree",
         "author": { "id": 2, "username": "teacher", "name": "胡军成", "role": "teacher" },
-        "created_at": "2026-10-12T02:01:00+00:00"
+        "created_at": "2026-10-12T02:01:00+00:00",
+        "hidden": false,
+        "hidden_by": null,
+        "hidden_at": null,
+        "hidden_reason": "",
+        "parent_id": null,
+        "quote_statement_id": null,
+        "parent": null,
+        "quoted": null
       }
     ],
     "summary": {
@@ -350,24 +390,198 @@ Base URL 仍是 `/api`，问答接口统一挂在 `/api/qa` 前缀下。所有�
 任何已登录用户。请求：
 
 ```json
-{ "content": "发言内容", "position": "agree" }
+{ "content": "发言内容", "position": "agree", "parent_id": 1, "quote_statement_id": 1 }
 ```
 
 - `content` 必填且 ≤ 2000 字，否则 400 `invalid_content`。
 - `position` 可选，取值 `agree` / `disagree` / `neutral`，不填默认 `neutral`，非法值返回 400 `invalid_position`。
+- `parent_id` 可选，表示回复同话题下某条发言；发言不存在或不属于本话题返回 404 `statement_not_found`，参数格式错误返回 400 `invalid_parent`。
+- `quote_statement_id` 可选，表示引用同话题下某条发言；只给引用对象而未给回复对象时，自动把被引用发言作为回复对象。校验规则同 `parent_id`。
 - 话题已结束时返回 409 `topic_closed`。
 
-成功返回 201 和新发言对象。
+成功返回 201 和新发言对象，对象含 `parent_id`、`quote_statement_id`、`parent`、`quoted` 字段（未回复/引用时为 `null`）。
+
+### PATCH /api/qa/topics/{id}/statements/{statement_id}
+
+仅管理员。隐藏（软删除）或恢复某条发言。请求：
+
+```json
+{ "hidden": true, "reason": "跑题" }
+```
+
+- 其他人调用返回 403 `permission_denied`；
+- `hidden` 必填，缺失返回 400 `invalid_hidden`；`reason` 可选且 ≤ 200 字，超长返回 400 `invalid_reason`；
+- 重复隐藏返回 409 `already_hidden`，重复恢复返回 409 `not_hidden`；
+- 话题不存在、发言不存在或发言不属于该话题，统一返回 404。
+
+成功返回 200 和被隐藏/恢复的发言对象（含 `hidden`、`hidden_by`、`hidden_at`、`hidden_reason`）。隐藏是软删除：普通用户的时间线里不再出现，也不参与规则汇总、AI 摘要和导出；管理员仍能看到原文与操作记录，并可恢复。发言依然不可编辑。
 
 ### PATCH /api/qa/topics/{id}
 
 仅管理员或话题发起人。请求：
 
 ```json
-{ "status": "closed", "ends_at": "2026-12-31T23:59:59Z" }
+{ "status": "closed", "ends_at": "2026-12-31T23:59:59Z", "category_id": 3, "document_id": 3, "version_id": 5 }
 ```
 
-字段均可选：`status` 取值 `open` / `closed`，非法值返回 400 `invalid_status`；`ends_at` 设为 ISO 8601 未来时间可定时结束，设为 `null` 可清除定时。结束时间格式错误或不是未来时间返回 400 `invalid_ends_at`。其他人操作返回 403 `permission_denied`。
+字段均可选：`status` 取值 `open` / `closed`，非法值返回 400 `invalid_status`；`ends_at` 设为 ISO 8601 未来时间可定时结束，设为 `null` 可清除定时；`category_id` 设为分类 id 可调整分类，设为 `null` 可清除分类；`document_id` / `version_id` 可调整或解除文档关联，`document_id` 设为 `null` 会同时清除版本关联。结束时间格式错误或不是未来时间返回 400 `invalid_ends_at`；分类不存在返回 404 `category_not_found`；文档或版本不存在分别返回 404 `document_not_found` / `version_not_found`，版本与文档不匹配返回 400 `version_mismatch`。其他人操作返回 403 `permission_denied`。
+
+### POST /api/qa/topics/{id}/ai-summary
+
+任何已登录用户。按需生成话题的 AI 决策摘要，请求体为空。
+
+- 未配置 `COSMOS_API_KEY` 返回 503 `ai_not_configured`；
+- 话题还没有发言返回 400 `no_statements`；
+- 调用模型失败返回 502 `ai_failed`，`message` 是可以直接展示的中文原因。
+
+成功返回 200：
+
+```json
+{
+  "data": {
+    "topic_id": 2,
+    "summary_text": "## 讨论概况\n...",
+    "statement_count": 6,
+    "generated_at": "2026-10-16T07:30:00+00:00",
+    "stale": false
+  }
+}
+```
+
+说明：摘要会落库到话题上，成功后再打开话题详情可直接从 `ai_summary` 字段读取；重复调用（即「重新生成」）会重新请求模型并覆盖旧内容。`stale` 表示摘要生成之后又有新发言。「是否达成统一意见」的结论始终来自 `GET /api/qa/topics/{id}/summary` 的规则汇总。
+
+### GET /api/qa/topics/{id}/export
+
+任何已登录用户。导出话题讨论为 Markdown 文件，响应带 `Content-Disposition: attachment`，文件名形如 `话题-2-课程考核分析报告的提交时间是否调整.md`。
+
+内容依次为：话题信息、`## 意见汇总（规则）`、`## AI 决策摘要`（未生成时写「（未生成）」）、`## 讨论时间线`（每条发言标注发言人与立场，回复与引用会额外标注被回复/被引用的人）。
+
+### POST /api/qa/topics/{id}/conclusion
+
+仅管理员或话题发起人。补录（或覆盖）话题的最终结论/决议。请求：
+
+```json
+{ "text": "经讨论决定：提交截止时间提前到第 16 周。", "share_to_document": true }
+```
+
+- `text` 必填且 ≤ 2000 字，否则 400 `invalid_conclusion`；
+- `share_to_document` 可选，为 `true` 时把结论回写到关联文档；话题没有关联文档返回 400 `no_linked_document`；
+- 其他人操作返回 403 `permission_denied`。
+
+成功返回 200 与新的结论对象（含 `text`、`by`、`at`、`shared`）。重新调用会覆盖上一条结论。
+
+### GET /api/qa/decisions?document_id={id}
+
+任何已登录用户。返回回写到该文档的最终结论，按记录时间倒序。缺少 `document_id` 返回 400 `invalid_document`。
+
+```json
+{
+  "data": [
+    {
+      "topic_id": 2,
+      "topic_title": "课程考核分析报告的提交时间是否调整",
+      "status": "open",
+      "conclusion": "经讨论决定：提交截止时间提前到第 16 周。",
+      "by": { "id": 2, "username": "teacher", "name": "胡军成", "role": "teacher" },
+      "at": "2026-10-16T08:08:00+00:00"
+    }
+  ]
+}
+```
+
+### GET /api/qa/categories
+
+返回问答话题分类列表，按排序值升序。列表项字段含 `id`、`name`、`sort_order`、`topic_count`、`created_at`。
+
+### POST /api/qa/categories
+
+仅管理员。请求：`{ "name": "分类名称", "sort_order": 0 }`。名称为空返回 400 `invalid_name`；重名返回 409 `name_exists`。成功返回 201。
+
+### PATCH /api/qa/categories/{id}
+
+仅管理员。可修改 `name` 和 `sort_order`，规则同新建；分类不存在返回 404 `category_not_found`。
+
+### DELETE /api/qa/categories/{id}
+
+仅管理员。分类下还有话题时返回 409 `category_has_topics`；成功返回 204。
+
+### POST /api/qa/topics/{id}/statements/{statement_id}/reports
+
+任何已登录用户。举报一条发言。请求：
+
+```json
+{ "reason": "这条发言与主题无关，而且带有嘲讽语气。" }
+```
+
+- `reason` 必填且 ≤ 500 字，否则 400 `invalid_reason`；
+- 不能举报自己的发言（400 `cannot_report_own`），不能举报已隐藏的发言（400 `statement_hidden`）；
+- 同一用户对同一条发言重复举报返回 409 `already_reported`；
+- 话题或发言不存在返回 404。
+
+成功返回 201 和举报对象。提交后会通知所有管理员（举报人自己除外）。
+
+### GET /api/qa/reports?status=pending
+
+仅管理员。返回举报队列，默认只返回待处理（`pending`），可选 `resolved` / `dismissed` / `all`。每个举报项除自身字段外，还带 `topic_title` 和被举报发言的快照：
+
+```json
+{
+  "data": {
+    "items": [
+      {
+        "id": 1,
+        "status": "pending",
+        "reason": "这条发言与主题无关。",
+        "topic_id": 2,
+        "topic_title": "课程考核分析报告的提交时间是否调整",
+        "reporter": { "id": 3, "username": "viewer", "name": "王老师", "role": "teacher" },
+        "statement": {
+          "id": 7,
+          "content": "测试123",
+          "hidden": false,
+          "author": { "id": 1, "username": "admin", "name": "管理员", "role": "admin" }
+        },
+        "created_at": "2026-10-16T08:59:32+00:00",
+        "handled_by": null,
+        "handled_at": null
+      }
+    ],
+    "pending": 1
+  }
+}
+```
+
+非管理员返回 403 `permission_denied`。
+
+### PATCH /api/qa/reports/{report_id}
+
+仅管理员。处理一条举报。请求：
+
+```json
+{ "action": "hide" }
+```
+
+- `action` 取值 `hide`（隐藏该发言并结案）或 `dismiss`（驳回举报），其他值返回 400 `invalid_action`；
+- 举报不存在返回 404，已经处理过返回 409 `report_handled`；
+- 可附带 `reason`（≤ 200 字）作为隐藏原因，不填则用举报理由。
+
+处理结果会自动发站内通知：`hide` 会通知举报人（`report_resolved`）和被隐藏发言的作者（`statement_hidden`）；`dismiss` 通知举报人（`report_dismissed`）。
+
+### GET /api/qa/notifications?limit=30
+
+任何已登录用户。返回自己的通知（按时间倒序，默认 30 条，最多 100）和未读数：
+
+```json
+{ "data": { "items": [ { "id": 1, "kind": "report_resolved", "message": "...", "read": false, "topic_id": 2, "created_at": "..." } ], "unread": 1 } }
+```
+
+### GET /api/qa/notifications/unread-count
+
+任何已登录用户。返回 `{"unread": 1, "pending_reports": 0}`，供顶栏徽标使用；`pending_reports` 只对管理员有意义，非管理员恒为 0。
+
+### POST /api/qa/notifications/read
+
+任何已登录用户。把自己的通知标记为已读：不带参数表示全部标记；传 `{"ids": [1, 2]}` 只标记指定通知。返回 `{"updated": 2}`。
 
 ## 问答权限映射
 
@@ -379,3 +593,158 @@ Base URL 仍是 `/api`，问答接口统一挂在 `/api/qa` 前缀下。所有�
 | GET /api/qa/topics/{id}/summary | 允许 | 允许 | 允许 |
 | POST /api/qa/topics/{id}/statements | 允许（话题未结束时） | 允许（话题未结束时） | 允许（话题未结束时） |
 | PATCH /api/qa/topics/{id} | 允许 | 允许 | 403 |
+| GET /api/qa/categories | 允许 | 允许 | 允许 |
+| POST /api/qa/topics/{id}/ai-summary | 允许 | 允许 | 允许 |
+| GET /api/qa/topics/{id}/export | 允许 | 允许 | 允许 |
+| POST /api/qa/topics/{id}/conclusion | 允许 | 允许 | 403 |
+| PATCH /api/qa/topics/{id}/statements/{statement_id} | 允许 | 403 | 403 |
+| GET /api/qa/decisions | 允许 | 允许 | 允许 |
+| POST /api/qa/topics/{id}/statements/{statement_id}/reports | 允许 | 允许 | 允许 |
+| GET /api/qa/reports | 允许 | 403 | 403 |
+| PATCH /api/qa/reports/{report_id} | 允许 | 403 | 403 |
+| GET /api/qa/notifications | 允许 | 允许 | 允许 |
+| GET /api/qa/notifications/unread-count | 允许 | 允许 | 允许 |
+| POST /api/qa/notifications/read | 允许 | 允许 | 允许 |
+| POST /api/qa/categories | 允许 | 403 | 403 |
+| PATCH /api/qa/categories/{id} | 允许 | 403 | 403 |
+| DELETE /api/qa/categories/{id} | 允许 | 403 | 403 |
+
+## 表格协作接口
+
+表格协作模块的详细需求、决策和数据模型见 `table-module-requirements.md`，这里给出接口速查。
+
+### GET /api/tables?q=
+
+任何已登录用户。返回表格列表，`q` 可按名称或说明模糊搜索。列表项字段：
+
+```json
+{
+  "id": 1,
+  "name": "2026届毕业设计进度表",
+  "description": "跟踪选题与进度",
+  "owner": { "id": 2, "username": "teacher", "name": "胡军成", "role": "teacher" },
+  "column_count": 4,
+  "row_count": 2,
+  "version_number": 1,
+  "created_at": "2026-10-18T10:00:00+00:00",
+  "updated_at": "2026-10-18T10:00:00+00:00"
+}
+```
+
+### POST /api/tables
+
+任何已登录用户。请求：
+
+```json
+{ "name": "2026届毕业设计进度表", "description": "跟踪选题与进度", "columns": ["组号", "题目", "成员", "进度"] }
+```
+
+`columns` 可以是字符串数组，也可以是 `[{"name": "组号", "type": "text"}]` 对象数组。至少一列。成功返回 201，`data` 除列表字段外还带 `columns`、`rows`。
+
+### GET /api/tables/{id}
+
+任何已登录用户。返回 `columns`、`rows` 与列表字段，并额外带 `can_manage`（当前用户是否为创建者或管理员）。
+
+### PATCH /api/tables/{id}
+
+创建者/管理员。请求 `{"name": "...", "description": "..."}`，两个字段都可选。修改名称/说明会写入一条 `rename` 修改记录。
+
+### DELETE /api/tables/{id}
+
+创建者/管理员。删除表格及其版本、修改记录，返回 204。
+
+### PATCH /api/tables/{id}/cells
+
+任何已登录用户。请求：
+
+```json
+{ "row_key": "r1", "column_key": "col2", "value": "在线文档协作平台" }
+```
+
+`value` 作为普通文本保存。成功返回 `{"table": ..., "change": ..., "row": ...}`；值未变化时 `change` 为 `null` 且不写记录。`row_key` 不存在返回 404 `row_not_found`，`column_key` 不存在返回 404 `column_not_found`，值超过 5000 字返回 400 `invalid_value`。
+
+### POST /api/tables/{id}/rows
+
+任何已登录用户。请求体可为 `{"cells": {"col1": "1"}}` 或空对象。新行的 `row_key` 自动生成，返回 201 和 `{"table", "change", "row"}`。
+
+### DELETE /api/tables/{id}/rows/{row_key}
+
+创建者/管理员。删除前自动保存快照，删除指定行并写入 `row_delete` 记录，返回 `{"table", "change"}`。
+
+### POST /api/tables/{id}/rows/delete
+
+创建者/管理员。请求 `{"row_keys": ["r1", "r3"]}` 批量删除行。删除前自动保存一个快照，删除后写入 `rows_delete` 记录，返回 `{"table", "change", "deleted_count"}`。
+
+### POST /api/tables/{id}/columns
+
+任何已登录用户。请求 `{"name": "备注"}`。列名重复返回 409 `column_exists`。新增列属于结构变化，会自动生成一个新版本。
+
+### PATCH /api/tables/{id}/columns/{column_key}
+
+创建者/管理员。请求可只含 `{"name": "新列名"}`、`{"width": 240}` 或两者都带。`width` 取值 40~600。修改会写入 `column_update` 记录。
+
+### DELETE /api/tables/{id}/columns/{column_key}
+
+创建者/管理员。删除前自动保存快照，删除该列并清掉所有行里对应的单元格数据，写入 `column_delete` 记录。表格只剩一列时返回 400 `cannot_delete_last_column`。
+
+### POST /api/tables/{id}/columns/delete
+
+创建者/管理员。请求 `{"column_keys": ["col1", "col2"]}` 批量删除列。删除前自动保存快照，写入 `columns_delete` 记录；不允许删光所有列。
+
+### GET /api/tables/{id}/changes?kind=&limit=
+
+任何已登录用户。修改记录按时间倒序，`kind` 可选过滤，`limit` 默认不限（上限 500）。每条记录字段：
+
+```json
+{
+  "id": 1,
+  "kind": "cell_update",
+  "editor": { "id": 2, "username": "teacher", "name": "胡军成" },
+  "row_key": "r1",
+  "column_key": "col2",
+  "column_name": "题目",
+  "old_value": "旧题目",
+  "new_value": "在线文档协作平台",
+  "detail": {},
+  "created_at": "2026-10-18T10:01:00+00:00"
+}
+```
+
+### GET /api/tables/{id}/versions
+
+任何已登录用户。版本列表按版本号倒序。每项含 `version_number`、`changelog`、`editor`、`created_at`、`column_count`、`row_count`。
+
+### POST /api/tables/{id}/versions
+
+创建者/管理员。请求 `{"changelog": "期中检查前定稿"}`（可省略，默认「手动保存快照」），成功返回 201 和完整快照。
+
+### GET /api/tables/{id}/versions/{vid}
+
+任何已登录用户。返回版本详情，含完整 `columns`、`rows` 快照。
+
+### POST /api/tables/{id}/versions/{vid}/rollback
+
+创建者/管理员。把当前表格恢复为该版本快照，并把这次回滚保存为新版本。返回 `{"table", "version"}`。
+
+## 表格协作权限映射
+
+| 接口 | 管理员 | 创建者 | 其他教师 |
+| --- | --- | --- | --- |
+| GET /api/tables | 允许 | 允许 | 允许 |
+| POST /api/tables | 允许 | 允许 | 允许 |
+| GET /api/tables/{id} | 允许 | 允许 | 允许 |
+| PATCH /api/tables/{id} | 允许 | 允许 | 403 |
+| DELETE /api/tables/{id} | 允许 | 允许 | 403 |
+| PATCH /api/tables/{id}/cells | 允许 | 允许 | 允许 |
+| POST /api/tables/{id}/rows | 允许 | 允许 | 允许 |
+| DELETE /api/tables/{id}/rows/{row_key} | 允许 | 允许 | 403 |
+| POST /api/tables/{id}/rows/delete | 允许 | 允许 | 403 |
+| POST /api/tables/{id}/columns | 允许 | 允许 | 允许 |
+| PATCH /api/tables/{id}/columns/{column_key} | 允许 | 允许 | 403 |
+| DELETE /api/tables/{id}/columns/{column_key} | 允许 | 允许 | 403 |
+| POST /api/tables/{id}/columns/delete | 允许 | 允许 | 403 |
+| GET /api/tables/{id}/changes | 允许 | 允许 | 允许 |
+| GET /api/tables/{id}/versions | 允许 | 允许 | 允许 |
+| POST /api/tables/{id}/versions | 允许 | 允许 | 403 |
+| GET /api/tables/{id}/versions/{vid} | 允许 | 允许 | 允许 |
+| POST /api/tables/{id}/versions/{vid}/rollback | 允许 | 允许 | 403 |

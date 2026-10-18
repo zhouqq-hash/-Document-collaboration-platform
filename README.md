@@ -1,11 +1,11 @@
 # 教学文档协作平台
 
-当前仓库已实现“文档管理模块”和“问答管理模块”，采用 Flask JSON API + 静态前端原型。
+当前仓库已实现“文档管理模块”“问答管理模块”和“表格协作模块”，采用 Flask JSON API + 静态前端原型。
 
 ## 目录
 
 - `docs/`：全部文档的索引和分组见 `docs/README.md`（需求、架构、接口规范、原型验收、微信登录手册与流程、部署、Django 对照学习、工作日志）。上游给的原始 PDF 收在 `docs/reference/` 下，只做参考，不属于本仓库产出。
-- `prototype/`：业务方向原型的入口页，下面存放 `documents/`（文档管理模块原型，已接入 Flask API，入口页只展示它）和 `taskman/`（任务看板原型，已从入口页撤下、文件暂留）。
+- `prototype/`：业务方向原型的入口页，下面存放 `documents/`（文档管理模块原型）、`qa/`（问答管理模块原型）、`table/`（表格协作模块原型）和 `taskman/`（任务看板原型，已从入口页撤下、文件暂留），均已接入 Flask API。
 - `backend/`：Flask 后端实现。
 - `djangotutorial/`：Django 官方教程的练习项目，属于对照学习资料，不是本项目成果，分享给别人时注意区分。
 
@@ -81,12 +81,13 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned
 
 ## 查看原型
 
-`http://127.0.0.1:5000/` 是原型入口页，当前只展示文档管理模块原型：
+`http://127.0.0.1:5000/` 是原型入口页，展示三个已完成的业务模块：
 
 | 原型 | 入口 | 说明 |
 | --- | --- | --- |
 | 文档管理模块原型 | `http://127.0.0.1:5000/documents/index.html` | 已接入真实 API，必须先启动后端 |
 | 问答管理模块原型 | `http://127.0.0.1:5000/qa/index.html` | 已接入真实 API，话题发起 / 时间线聚合 / 意见汇总 |
+| 表格协作模块原型 | `http://127.0.0.1:5000/table/index.html` | 已接入真实 API，行内编辑 / 修改记录 / 版本回滚 |
 
 先启动后端：
 
@@ -94,7 +95,7 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned
 .\.venv\Scripts\python.exe backend\run.py
 ```
 
-再打开 `http://127.0.0.1:5000/`，未登录会先进入登录页，登录成功后回到模块入口页，再选择进入文档管理或问答管理。原型页面不能直接双击打开，因为 `file://` 方式无法调用 Flask API。
+再打开 `http://127.0.0.1:5000/`，未登录会先进入登录页，登录成功后回到模块入口页，再选择进入文档管理、问答讨论或表格协作。原型页面不能直接双击打开，因为 `file://` 方式无法调用 Flask API。
 
 ## 常见问题
 

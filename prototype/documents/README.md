@@ -7,13 +7,17 @@
 1. `index.html`：登录。
 2. `categories.html`：选择文档分类。
 3. `documents.html`：查看文档列表。
-4. `document-detail.html?id=1`：查看文档详情。
+4. `document-detail.html?id=1`：查看文档详情（含关联的问答讨论）。
 5. `upload-version.html?id=1`：上传新版本。
 6. `versions.html?id=1`：查看历史版本。
 7. `download.html?id=1&version_id=1`：下载确认。
 8. `account.html`：账号设置，绑定 / 解绑微信。
 
 另外 `wechat-callback.html` 是微信授权回跳的中转页，不手写地址进去，扫码后会自动跳到它。
+
+文档详情页底部有「相关讨论」卡片，展示问答模块中关联到该文档的话题，点「发起讨论」会带着文档 id 跳到问答模块的发起话题页。
+
+上方还有「文档决议」卡片：问答话题里勾选「回写到关联文档」的最终结论会汇总到这里，点标题可以回到对应话题。
 
 ## 演示账号
 
