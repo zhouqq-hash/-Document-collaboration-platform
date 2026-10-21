@@ -748,3 +748,74 @@ Base URL 仍是 `/api`，问答接口统一挂在 `/api/qa` 前缀下。所有�
 | POST /api/tables/{id}/versions | 允许 | 允许 | 403 |
 | GET /api/tables/{id}/versions/{vid} | 允许 | 允许 | 允许 |
 | POST /api/tables/{id}/versions/{vid}/rollback | 允许 | 允许 | 403 |
+
+## 文档 AI 接口
+
+统一走 Cosmos 的 OpenAI 兼容接口，Key 通过 `COSMOS_API_KEY` 环境变量配置。手动问答 / 预审没配 Key 时返回 503 `ai_not_configured`；自动预审没配 Key 时会留下一条 `skipped` 记录。模型调用失败返回 502 `ai_failed`。
+
+### POST /api/documents/{id}/ai/qa
+
+任何已登录用户。请求：
+
+```json
+{
+  "question": "总学分要求是多少？",
+  "version_id": 1,
+  "history": [
+    {"role": "user", "content": "上一轮问题"},
+    {"role": "assistant", "content": "上一轮回答"}
+  ]
+}
+```
+
+`version_id` 省略时使用当前版本；`history` 只保留最近 8 条 user / assistant 消息。成功返回 `document_id`、`version_id`、`version_number`、`question`、`answer`、`model`、`truncated`。文档正文最多读取 `AI_MAX_DOCUMENT_CHARS`（默认 60000）个字符。
+
+### POST /api/documents/{id}/ai/review
+
+管理员或文档负责人。请求：
+
+```json
+{
+  "version_id": 1,
+  "spec_document_ids": [2, 3]
+}
+```
+
+`spec_document_ids` 可选，最多 3 份，取各规范的当前版本；不传时使用该文档所属分类的 `default_spec_document_ids`，分类也没配置时只做内部一致性与版本变化检查。
+
+成功返回 201 和预审记录。`status` 为 pending / running / done / failed / skipped，`source` 为 manual / auto；`result` 含 `verdict`（pass / risk / unknown）、`summary`、`issues`、`spec_checks`、`changes`。
+
+### GET /api/documents/{id}/ai/reviews?limit=10
+
+任何已登录用户。按时间倒序返回预审历史，`limit` 上限 30。
+
+### PATCH /api/documents/{id}/ai/reviews/{review_id}/decision
+
+管理员或文档负责人。对已完成的预审做人工确认：
+
+```json
+{"decision": "return", "note": "请统一学分说明"}
+```
+
+`decision` 只能是 `pass` 或 `return`；`return` 时必须填写 `note`。成功返回更新后的预审记录，含 `human_decision`、`human_note`、`human_reviewer`、`human_reviewed_at`。
+
+### 分类默认规范
+
+管理员通过 `PATCH /api/categories/{id}` 配置：
+
+```json
+{"default_spec_document_ids": [2, 3]}
+```
+
+最多 3 份，文档必须存在。`GET /api/categories` 会同时返回 `default_spec_document_ids` 和 `default_spec_documents`（含标题）。
+
+### 上传新版本后的自动预审
+
+`POST /api/documents/{id}/versions` 成功后，如果 `AI_AUTO_REVIEW_ENABLED` 为真（默认），会创建一条 `source=auto` 的预审任务，并自动带入该分类的默认规范。生产环境默认在后台线程执行；`AI_AUTO_REVIEW_SYNC=1` 可改为同步执行（测试用）。上传响应本身不受预审耗时影响。
+
+| 接口 | 管理员 | 文档负责人 | 其他教师 |
+| --- | --- | --- | --- |
+| POST /api/documents/{id}/ai/qa | 允许 | 允许 | 允许 |
+| POST /api/documents/{id}/ai/review | 允许 | 允许 | 403 |
+| GET /api/documents/{id}/ai/reviews | 允许 | 允许 | 允许 |
+| PATCH /api/documents/{id}/ai/reviews/{review_id}/decision | 允许 | 允许 | 403 |

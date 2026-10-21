@@ -22,6 +22,7 @@ def app():
     config = {
         "TESTING": True,
         "SECRET_KEY": "test-secret",
+        "AI_AUTO_REVIEW_ENABLED": False,
         "SQLALCHEMY_DATABASE_URI": f"sqlite:///{temp_dir / 'test.db'}",
         "SQLALCHEMY_TRACK_MODIFICATIONS": False,
         "UPLOAD_FOLDER": str(media_dir),
@@ -82,6 +83,7 @@ def build_test_config(temp_dir, **overrides):
     config = {
         "TESTING": True,
         "SECRET_KEY": "test-secret",
+        "AI_AUTO_REVIEW_ENABLED": False,
         "SQLALCHEMY_DATABASE_URI": f"sqlite:///{temp_dir / 'test.db'}",
         "SQLALCHEMY_TRACK_MODIFICATIONS": False,
         "UPLOAD_FOLDER": str(temp_dir / "media"),

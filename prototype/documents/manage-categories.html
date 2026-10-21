@@ -42,6 +42,15 @@
             <label for="sortOrder">排序值</label>
             <input id="sortOrder" name="sort_order" type="number" value="0" />
           </div>
+          <div>
+            <label>默认规范（可选，最多 3 份）</label>
+            <p class="muted" style="margin: -2px 0 10px">
+              上传该分类的文档后，自动预审会默认对照这些规范。
+            </p>
+            <div id="defaultSpecOptions" class="spec-options">
+              <span class="muted">加载中…</span>
+            </div>
+          </div>
           <div class="actions">
             <button class="btn btn-primary" id="categorySubmitButton" type="submit">新建分类</button>
             <button class="btn btn-outline" id="categoryCancelButton" type="button" hidden>取消</button>

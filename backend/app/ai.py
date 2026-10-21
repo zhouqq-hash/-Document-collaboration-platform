@@ -17,8 +17,8 @@ class AIError(Exception):
     """调用大模型失败。message 是可以直接展示给用户的中文说明。"""
 
 
-DEFAULT_API_BASE = "https://cosmos.datapower.top/v1"
-DEFAULT_MODEL = "deepseek-v4-flash-0731"
+DEFAULT_API_BASE = "https://api.siliconflow.cn/v1"
+DEFAULT_MODEL = "deepseek-ai/DeepSeek-V4-Flash"
 
 # 手册附录 B 的错误码 -> 处理建议
 _STATUS_HINTS = {

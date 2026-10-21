@@ -5,12 +5,38 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
+def _load_dotenv():
+    """从 backend/.env 读取本地密钥（该文件已被 .gitignore 忽略，不会提交）。"""
+    env_file = BASE_DIR / ".env"
+    if not env_file.exists():
+        return
+    for line in env_file.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        key, value = key.strip(), value.strip()
+        if key and key not in os.environ:
+            os.environ[key] = value
+
+
+_load_dotenv()
+
+
 def env_int(name, default):
     """读整数环境变量，写错时回落到默认值而不是启动失败。"""
     try:
         return int(os.environ.get(name, default))
     except (TypeError, ValueError):
         return int(default)
+
+
+def env_bool(name, default):
+    """读布尔环境变量；没设置时使用传入的默认值。"""
+    value = os.environ.get(name)
+    if value is None:
+        return bool(default)
+    return value.strip().lower() not in {"0", "false", "no", "off"}
 
 
 class Config:
@@ -27,15 +53,21 @@ class Config:
     COS_SECRET_KEY = os.environ.get("COS_SECRET_KEY")
     COS_REGION = os.environ.get("COS_REGION")
     COS_BUCKET = os.environ.get("COS_BUCKET")
-    # Cosmos 模型推理平台（OpenAI 兼容接口）：AI 问答和自动预审都走这里
+    # 硅基流动 SiliconFlow（OpenAI 兼容接口）：AI 问答和自动预审都走这里
     COSMOS_API_BASE = os.environ.get(
-        "COSMOS_API_BASE", "https://cosmos.datapower.top/v1"
+        "COSMOS_API_BASE", "https://api.siliconflow.cn/v1"
     ).rstrip("/")
     COSMOS_API_KEY = os.environ.get("COSMOS_API_KEY", "")
-    COSMOS_MODEL = os.environ.get("COSMOS_MODEL", "deepseek-v4-flash-0731")
+    COSMOS_MODEL = os.environ.get("COSMOS_MODEL", "deepseek-ai/DeepSeek-V4-Flash")
     # 问答要等模型写完答案，预审要读多份文档，所以超时分开设
     COSMOS_QA_TIMEOUT = env_int("COSMOS_QA_TIMEOUT", 120)
     COSMOS_REVIEW_TIMEOUT = env_int("COSMOS_REVIEW_TIMEOUT", 180)
+    # 一次最多把多少正文交给模型，防止超长文件把上下文塞满
+    AI_MAX_DOCUMENT_CHARS = env_int("AI_MAX_DOCUMENT_CHARS", 60000)
+    AI_MAX_REVIEW_CHARS = env_int("AI_MAX_REVIEW_CHARS", 80000)
+    # 上传新版本后是否自动创建预审任务；AI_AUTO_REVIEW_SYNC 仅测试时打开
+    AI_AUTO_REVIEW_ENABLED = env_bool("AI_AUTO_REVIEW_ENABLED", True)
+    AI_AUTO_REVIEW_SYNC = env_bool("AI_AUTO_REVIEW_SYNC", False)
     # AI 摘要走页面交互，等待时间要明显短于问答，避免用户干等
     COSMOS_SUMMARY_TIMEOUT = env_int("COSMOS_SUMMARY_TIMEOUT", 30)
     # 微信登录：配好 APP_ID / APP_SECRET 走真实微信接口，没配就进演示模式

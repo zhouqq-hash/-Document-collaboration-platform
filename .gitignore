@@ -16,3 +16,6 @@ backend/media/*
 
 # local WeChat live-test credentials (contains AppSecret, never commit)
 tools/*.local.env
+
+# local backend secrets (API keys, never commit)
+.env

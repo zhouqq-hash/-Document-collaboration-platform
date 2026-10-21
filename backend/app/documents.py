@@ -6,8 +6,17 @@ from pathlib import Path
 from flask import Blueprint, current_app, request, send_file
 from flask_login import current_user, login_required
 
-from . import db
-from .models import Document, DocumentCategory, DocumentVersion, User
+from . import ai, ai_review, db
+from .extract import ExtractError
+from .models import (
+    Document,
+    DocumentAiReview,
+    DocumentCategory,
+    DocumentVersion,
+    User,
+    utcnow,
+)
+from .storage import StorageError
 from .utils import api_error, api_success
 
 
@@ -103,7 +112,18 @@ def create_category():
     except (TypeError, ValueError):
         sort_order = 0
 
-    category = DocumentCategory(name=name, sort_order=sort_order)
+    try:
+        default_spec_ids = ai_review.normalize_category_spec_ids(
+            payload.get("default_spec_document_ids")
+        )
+    except ai_review.ReviewError as exc:
+        return api_error(str(exc), "invalid_spec", exc.status)
+
+    category = DocumentCategory(
+        name=name,
+        sort_order=sort_order,
+        default_spec_document_ids=default_spec_ids,
+    )
     db.session.add(category)
     db.session.commit()
     return api_success(category.to_dict(), status=201)
@@ -139,6 +159,16 @@ def update_category(category_id):
             category.sort_order = int(payload.get("sort_order"))
         except (TypeError, ValueError):
             category.sort_order = 0
+
+    if "default_spec_document_ids" in payload:
+        try:
+            category.default_spec_document_ids = (
+                ai_review.normalize_category_spec_ids(
+                    payload.get("default_spec_document_ids")
+                )
+            )
+        except ai_review.ReviewError as exc:
+            return api_error(str(exc), "invalid_spec", exc.status)
 
     db.session.commit()
     return api_success(category.to_dict())
@@ -306,6 +336,10 @@ def upload_version(document_id):
         return api_error(str(exc), "invalid_file", 400)
 
     db.session.commit()
+    try:
+        ai_review.create_auto_review(document, version, current_user)
+    except Exception as exc:  # 预审排队失败不能影响版本上传本身
+        current_app.logger.exception("创建自动预审任务失败: %s", exc)
     return api_success(version.to_dict(), status=201)
 
 #下载版本
@@ -328,3 +362,257 @@ def download_version(document_id, version_id):
         as_attachment=True,
         download_name=version.filename,
     )
+
+
+# ------------------------------------------------------------------ AI 辅助
+
+
+def _resolve_ai_version(document, raw_version_id):
+    """没传版本就用当前版本；传了就校验它确实属于这篇文档。"""
+    if raw_version_id in (None, ""):
+        return document.current_version, None
+
+    version_id = _as_int(raw_version_id)
+    if version_id is None:
+        return None, api_error("版本参数不合法", "invalid_version", 400)
+
+    version = db.session.get(DocumentVersion, version_id)
+    if version is None or version.document_id != document.id:
+        return None, api_error("版本不存在", "version_not_found", 404)
+    return version, None
+
+
+def _clean_history(raw_history):
+    """只保留最近 8 轮、合法的 user/assistant 消息。"""
+    history = []
+    if not isinstance(raw_history, list):
+        return history
+    for item in raw_history[-8:]:
+        if not isinstance(item, dict):
+            continue
+        role = item.get("role")
+        content = item.get("content")
+        if role not in {"user", "assistant"} or not isinstance(content, str):
+            continue
+        content = content.strip()
+        if content:
+            history.append({"role": role, "content": content[:4000]})
+    return history
+
+
+def _build_qa_messages(document, version, text, question, history):
+    system = (
+        "你是教学文档协作平台的文档问答助手。"
+        "只能依据下面提供的文档正文回答；正文里没有的信息必须明确说"
+        "“文档中没有提到”，不要编造。回答使用中文，先给结论，再给依据；"
+        "必要时引用原文关键句。"
+    )
+    context = (
+        f"文档标题：{document.title}\n"
+        f"当前版本：v{version.version_number}\n"
+        f"文件名：{version.filename}\n\n"
+        f"文档正文：\n{text}"
+    )
+    messages = [{"role": "system", "content": system + "\n\n" + context}]
+    messages.extend(history)
+    messages.append({"role": "user", "content": question})
+    return messages
+
+
+@bp.post("/documents/<int:document_id>/ai/qa")
+@login_required
+def document_ai_qa(document_id):
+    document = _get_document_or_404(document_id)
+    if document is None:
+        return api_error("文档不存在", "document_not_found", 404)
+
+    payload = request.get_json(silent=True) or {}
+    question = (payload.get("question") or "").strip()
+    if not question:
+        return api_error("请输入问题", "invalid_question", 400)
+    if len(question) > 2000:
+        return api_error(
+            "问题太长，请控制在 2000 字以内", "question_too_long", 400
+        )
+
+    version, error = _resolve_ai_version(
+        document, payload.get("version_id")
+    )
+    if error is not None:
+        return error
+    if version is None:
+        return api_error(
+            "文档还没有上传版本，无法问答", "no_version", 400
+        )
+
+    if not ai.is_configured():
+        return api_error(
+            "当前环境没有配置 COSMOS_API_KEY，无法使用 AI 问答",
+            "ai_not_configured",
+            503,
+        )
+
+    try:
+        text = ai_review.read_version_text(version)
+    except (ExtractError, StorageError, OSError) as exc:
+        return api_error(
+            f"无法读取文档正文：{exc}", "extract_failed", 422
+        )
+
+    text, truncated = ai_review.clip_text(
+        text, current_app.config.get("AI_MAX_DOCUMENT_CHARS", 60000)
+    )
+    history = _clean_history(payload.get("history"))
+    messages = _build_qa_messages(
+        document, version, text, question, history
+    )
+
+    try:
+        answer = ai.chat(
+            messages,
+            temperature=0.2,
+            max_tokens=1200,
+            timeout=current_app.config.get("COSMOS_QA_TIMEOUT", 120),
+        )
+    except ai.AIError as exc:
+        return api_error(str(exc), "ai_failed", 502)
+
+    return api_success(
+        {
+            "document_id": document.id,
+            "version_id": version.id,
+            "version_number": version.version_number,
+            "question": question,
+            "answer": (answer or "").strip(),
+            "model": current_app.config.get("COSMOS_MODEL", ""),
+            "truncated": truncated,
+        }
+    )
+
+
+@bp.post("/documents/<int:document_id>/ai/review")
+@login_required
+def document_ai_review(document_id):
+    document = _get_document_or_404(document_id)
+    if document is None:
+        return api_error("文档不存在", "document_not_found", 404)
+    if not (current_user.is_admin or document.owner_id == current_user.id):
+        return api_error(
+            "只有管理员或文档负责人可以发起 AI 预审",
+            "permission_denied",
+            403,
+        )
+
+    payload = request.get_json(silent=True) or {}
+    version, error = _resolve_ai_version(
+        document, payload.get("version_id")
+    )
+    if error is not None:
+        return error
+    if version is None:
+        return api_error(
+            "文档还没有上传版本，无法预审", "no_version", 400
+        )
+
+    if not ai.is_configured():
+        return api_error(
+            "当前环境没有配置 COSMOS_API_KEY，无法使用 AI 预审",
+            "ai_not_configured",
+            503,
+        )
+
+    try:
+        spec_ids = ai_review.normalize_spec_ids(
+            document, payload.get("spec_document_ids")
+        )
+    except ai_review.ReviewError as exc:
+        return api_error(str(exc), "invalid_spec", exc.status)
+
+    review = ai_review.create_review(
+        document,
+        version,
+        current_user,
+        source="manual",
+        spec_ids=spec_ids,
+    )
+    review = ai_review.perform_review(review.id)
+    if review is None:
+        return api_error("预审任务不存在", "review_not_found", 404)
+    if review.status != "done":
+        return api_error(
+            review.error_message or "预审失败", "ai_review_failed", 502
+        )
+    return api_success(review.to_dict(), status=201)
+
+
+@bp.get("/documents/<int:document_id>/ai/reviews")
+@login_required
+def list_document_ai_reviews(document_id):
+    document = _get_document_or_404(document_id)
+    if document is None:
+        return api_error("文档不存在", "document_not_found", 404)
+
+    try:
+        limit = int(request.args.get("limit", 10))
+    except (TypeError, ValueError):
+        limit = 10
+    limit = min(max(limit, 1), 30)
+
+    reviews = (
+        DocumentAiReview.query.filter_by(document_id=document.id)
+        .order_by(
+            DocumentAiReview.created_at.desc(),
+            DocumentAiReview.id.desc(),
+        )
+        .limit(limit)
+        .all()
+    )
+    return api_success([review.to_dict() for review in reviews])
+
+
+@bp.patch(
+    "/documents/<int:document_id>/ai/reviews/<int:review_id>/decision"
+)
+@login_required
+def decide_document_ai_review(document_id, review_id):
+    document = _get_document_or_404(document_id)
+    if document is None:
+        return api_error("文档不存在", "document_not_found", 404)
+    if not (current_user.is_admin or document.owner_id == current_user.id):
+        return api_error(
+            "只有管理员或文档负责人可以确认预审结果",
+            "permission_denied",
+            403,
+        )
+
+    review = db.session.get(DocumentAiReview, review_id)
+    if review is None or review.document_id != document.id:
+        return api_error("预审记录不存在", "review_not_found", 404)
+    if review.status != "done":
+        return api_error(
+            "只有已完成的预审才能人工确认",
+            "review_not_done",
+            409,
+        )
+
+    payload = request.get_json(silent=True) or {}
+    decision = (payload.get("decision") or "").strip()
+    if decision not in {"pass", "return"}:
+        return api_error(
+            "decision 只能是 pass 或 return",
+            "invalid_decision",
+            400,
+        )
+
+    note = (payload.get("note") or "").strip()[:2000]
+    if decision == "return" and not note:
+        return api_error(
+            "退回修改时需要填写原因", "note_required", 400
+        )
+
+    review.human_decision = decision
+    review.human_note = note
+    review.human_reviewer = current_user
+    review.human_reviewed_at = utcnow()
+    db.session.commit()
+    return api_success(review.to_dict())

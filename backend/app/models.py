@@ -1,3 +1,4 @@
+import json
 from datetime import datetime, timezone
 
 from flask_login import UserMixin
@@ -100,15 +101,32 @@ class DocumentCategory(db.Model):
     name = db.Column(db.String(80), unique=True, nullable=False)
     sort_order = db.Column(db.Integer, nullable=False, default=0)
     created_at = db.Column(db.DateTime, default=utcnow, nullable=True)
+    # 该分类默认参考的规范文档 ID 列表（最多 3 个，由预审服务限制）
+    default_spec_document_ids = db.Column(db.JSON, nullable=True, default=list)
 
     documents = db.relationship("Document", back_populates="category")
 
     def to_dict(self):
+        spec_ids = []
+        for value in self.default_spec_document_ids or []:
+            try:
+                spec_ids.append(int(value))
+            except (TypeError, ValueError):
+                continue
+        spec_documents = []
+        for document_id in spec_ids:
+            document = db.session.get(Document, document_id)
+            if document is not None:
+                spec_documents.append(
+                    {"id": document.id, "title": document.title}
+                )
         return {
             "id": self.id,
             "name": self.name,
             "sort_order": self.sort_order,
             "document_count": len(self.documents),
+            "default_spec_document_ids": spec_ids,
+            "default_spec_documents": spec_documents,
             "created_at": iso_utc(self.created_at),
         }
 
@@ -133,6 +151,13 @@ class Document(db.Model):
     )
     # 与问答模块打通：该文档下关联的话题
     qa_topics = db.relationship("QaTopic", back_populates="document")
+    # AI 预审历史
+    ai_reviews = db.relationship(
+        "DocumentAiReview",
+        back_populates="document",
+        cascade="all, delete-orphan",
+        order_by="DocumentAiReview.created_at.desc()",
+    )
     description = db.Column(db.String(500), default="")
     status = db.Column(
         db.String(16), nullable=False, default="active", server_default="active"
@@ -182,6 +207,7 @@ class DocumentVersion(db.Model):
 
     document = db.relationship("Document", back_populates="versions")
     uploader = db.relationship("User", back_populates="uploaded_versions")
+    ai_reviews = db.relationship("DocumentAiReview", back_populates="version")
 
     def to_dict(self):
         return {
@@ -191,6 +217,93 @@ class DocumentVersion(db.Model):
             "filename": self.filename,
             "changelog": self.changelog,
             "uploader": self.uploader.to_dict(),
+            "created_at": iso_utc(self.created_at),
+        }
+
+
+# AI 预审结果表
+class DocumentAiReview(db.Model):
+    __tablename__ = "document_ai_reviews"
+
+    id = db.Column(db.Integer, primary_key=True)
+    document_id = db.Column(
+        db.Integer, db.ForeignKey("documents.id"), nullable=False, index=True
+    )
+    version_id = db.Column(
+        db.Integer,
+        db.ForeignKey("document_versions.id"),
+        nullable=False,
+        index=True,
+    )
+    requester_id = db.Column(
+        db.Integer, db.ForeignKey("users.id"), nullable=False
+    )
+    status = db.Column(
+        db.String(16), nullable=False, default="pending", index=True
+    )
+    source = db.Column(db.String(16), nullable=False, default="manual")
+    spec_document_ids = db.Column(db.JSON, nullable=True, default=list)
+    model = db.Column(db.String(120), default="")
+    verdict = db.Column(db.String(16), nullable=False, default="unknown")
+    result_json = db.Column(db.Text, nullable=False, default="{}")
+    error_message = db.Column(db.Text, default="")
+    started_at = db.Column(db.DateTime, nullable=True)
+    finished_at = db.Column(db.DateTime, nullable=True)
+    human_decision = db.Column(
+        db.String(16), nullable=False, default="pending"
+    )
+    human_note = db.Column(db.Text, default="")
+    human_reviewer_id = db.Column(
+        db.Integer, db.ForeignKey("users.id"), nullable=True
+    )
+    human_reviewed_at = db.Column(db.DateTime, nullable=True)
+    created_at = db.Column(
+        db.DateTime, default=utcnow, nullable=False, index=True
+    )
+
+    document = db.relationship("Document", back_populates="ai_reviews")
+    version = db.relationship("DocumentVersion", back_populates="ai_reviews")
+    requester = db.relationship("User", foreign_keys=[requester_id])
+    human_reviewer = db.relationship(
+        "User", foreign_keys=[human_reviewer_id]
+    )
+
+    def to_dict(self):
+        try:
+            result = json.loads(self.result_json or "{}")
+        except (TypeError, ValueError):
+            result = {}
+        spec_ids = []
+        for value in self.spec_document_ids or []:
+            try:
+                spec_ids.append(int(value))
+            except (TypeError, ValueError):
+                continue
+        return {
+            "id": self.id,
+            "document_id": self.document_id,
+            "version_id": self.version_id,
+            "version_number": (
+                self.version.version_number if self.version else None
+            ),
+            "requester": self.requester.to_dict() if self.requester else None,
+            "status": self.status or "pending",
+            "source": self.source or "manual",
+            "spec_document_ids": spec_ids,
+            "model": self.model or "",
+            "verdict": self.verdict or "unknown",
+            "result": result,
+            "error": self.error_message or "",
+            "started_at": iso_utc(self.started_at),
+            "finished_at": iso_utc(self.finished_at),
+            "human_decision": self.human_decision or "pending",
+            "human_note": self.human_note or "",
+            "human_reviewer": (
+                self.human_reviewer.to_dict()
+                if self.human_reviewer
+                else None
+            ),
+            "human_reviewed_at": iso_utc(self.human_reviewed_at),
             "created_at": iso_utc(self.created_at),
         }
 

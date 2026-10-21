@@ -1076,10 +1076,464 @@ async function initDocumentDetail() {
         "documentTopics"
       ).innerHTML = `<span class="notice">${escapeHtml(error.message)}</span>`;
     }
+
+    await initDocumentAiPanels(doc, canUpload);
   } catch (error) {
     showPageMessage("detail", error.message, true);
   }
 }
+
+
+async function initDocumentAiPanels(doc, canReview) {
+  const container = document.getElementById("detail");
+  const current = doc.current_version;
+
+  // ---------------- AI 文档问答 ----------------
+  const qaSection = document.createElement("section");
+  qaSection.className = "card ai-card";
+  qaSection.innerHTML = `
+    <div class="card-head">
+      <h2>AI 文档问答</h2>
+      <span class="ai-tag">只基于当前版本正文</span>
+    </div>
+    <div class="ai-chat" id="aiChat" aria-live="polite">
+      <div class="ai-message assistant">你好，我可以根据这份文档的正文回答问题。文档里没有的内容我会直接说明。</div>
+    </div>
+    <form class="ai-compose" id="aiQaForm">
+      <textarea id="aiQuestion" rows="2" placeholder="例如：这份文档对毕业学分有什么要求？" ${current ? "" : "disabled"}></textarea>
+      <button class="btn btn-primary" type="submit" ${current ? "" : "disabled"}>提问</button>
+    </form>
+    <div class="ai-status" id="aiQaStatus">${current ? "" : "文档还没有上传版本，暂时不能提问。"}</div>
+  `;
+  container.appendChild(qaSection);
+
+  const chatEl = qaSection.querySelector("#aiChat");
+  const formEl = qaSection.querySelector("#aiQaForm");
+  const questionEl = qaSection.querySelector("#aiQuestion");
+  const askButton = formEl.querySelector("button");
+  const qaStatus = qaSection.querySelector("#aiQaStatus");
+  const history = [];
+
+  function appendAiMessage(role, content, extraClass = "") {
+    const message = document.createElement("div");
+    message.className = `ai-message ${role}${extraClass ? ` ${extraClass}` : ""}`;
+    message.textContent = content;
+    chatEl.appendChild(message);
+    chatEl.scrollTop = chatEl.scrollHeight;
+  }
+
+  formEl.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const question = questionEl.value.trim();
+    if (!question || !current) {
+      return;
+    }
+
+    appendAiMessage("user", question);
+    questionEl.value = "";
+    askButton.disabled = true;
+    qaStatus.textContent = "模型正在阅读文档，可能需要一会儿…";
+
+    try {
+      const result = await apiRequest(`/api/documents/${doc.id}/ai/qa`, {
+        method: "POST",
+        body: JSON.stringify({
+          question,
+          version_id: current.id,
+          history,
+        }),
+      });
+      const answer = result.answer || "模型没有返回内容";
+      appendAiMessage("assistant", answer);
+      history.push({ role: "user", content: question });
+      history.push({ role: "assistant", content: answer });
+      qaStatus.textContent = result.truncated
+        ? "文档较长，本次只读取了前面的部分正文。"
+        : "";
+    } catch (error) {
+      appendAiMessage("assistant", error.message, "error");
+      qaStatus.textContent = "";
+    } finally {
+      askButton.disabled = false;
+      questionEl.focus();
+    }
+  });
+
+  // ---------------- AI 预审 ----------------
+  const reviewSection = document.createElement("section");
+  reviewSection.className = "card ai-card";
+  reviewSection.innerHTML = `
+    <div class="card-head">
+      <h2>AI 预审</h2>
+      <span class="ai-tag">管理员 / 文档负责人</span>
+    </div>
+    <p class="muted ai-help">检查前后矛盾、与上一版的差异，并可按需对照参考规范。预审结果会留档。</p>
+    <div class="review-controls">
+      <div class="review-specs">
+        <div class="field-label">参考规范（可选，最多 3 份）</div>
+        <div class="spec-options" id="aiSpecOptions"><span class="muted">加载中…</span></div>
+        <p class="muted" style="margin: 8px 0 0; font-size: 12px">默认规范来自分类配置，可临时改选。</p>
+      </div>
+      <button class="btn btn-primary" type="button" id="aiReviewButton" ${canReview && current ? "" : "disabled"}>开始预审</button>
+    </div>
+    ${canReview ? "" : '<div class="ai-status">你当前为只读权限，不能发起预审。</div>'}
+    <div id="aiReviewResult"></div>
+    <div class="review-history">
+      <div class="field-label">最近预审记录</div>
+      <div id="aiReviewHistory" class="muted">加载中…</div>
+    </div>
+  `;
+  container.appendChild(reviewSection);
+
+  const specBox = reviewSection.querySelector("#aiSpecOptions");
+  const reviewButton = reviewSection.querySelector("#aiReviewButton");
+  const resultBox = reviewSection.querySelector("#aiReviewResult");
+  const historyBox = reviewSection.querySelector("#aiReviewHistory");
+  let loadedReviews = [];
+
+  try {
+    const documents = await apiRequest("/api/documents");
+    const defaultSpecIds = new Set(
+      (doc.category.default_spec_document_ids || []).map(String)
+    );
+    const candidates = documents.filter(
+      (item) => item.id !== doc.id && item.current_version
+    );
+    specBox.innerHTML = candidates.length
+      ? candidates
+          .slice(0, 50)
+          .map(
+            (item) => `
+              <label class="spec-option">
+                <input type="checkbox" name="aiSpec" value="${item.id}" ${defaultSpecIds.has(String(item.id)) ? "checked" : ""} />
+                <span>
+                  ${escapeHtml(item.title)}
+                  <small>${escapeHtml(item.category.name)} · v${item.current_version.version_number}</small>
+                </span>
+              </label>
+            `
+          )
+          .join("")
+      : '<span class="muted">暂无可选的规范文档，可以先上传规范文件。</span>';
+  } catch (error) {
+    specBox.innerHTML = `<span class="notice">${escapeHtml(error.message)}</span>`;
+  }
+
+  function verdictLabel(verdict) {
+    return (
+      {
+        pass: "通过",
+        risk: "有风险",
+        unknown: "待人工判断",
+      }[verdict] || "待人工判断"
+    );
+  }
+
+  function verdictClass(verdict) {
+    return (
+      {
+        pass: "verdict-pass",
+        risk: "verdict-risk",
+        unknown: "verdict-unknown",
+      }[verdict] || "verdict-unknown"
+    );
+  }
+
+  const REVIEW_STATUS_LABELS = {
+    pending: "排队中",
+    running: "预审中",
+    done: "已完成",
+    failed: "失败",
+    skipped: "已跳过",
+  };
+
+  function reviewStatusLabel(review) {
+    const status = review.status || "done";
+    return REVIEW_STATUS_LABELS[status] || status;
+  }
+
+  function reviewStatusClass(review) {
+    const status = review.status || "done";
+    if (status !== "done") {
+      return `status-${status}`;
+    }
+    return verdictClass(review.result?.verdict || review.verdict || "unknown");
+  }
+
+  function humanDecisionLabel(review) {
+    return (
+      {
+        pending: "待人工确认",
+        pass: "人工已通过",
+        return: "已退回修改",
+      }[review.human_decision] || "待人工确认"
+    );
+  }
+
+  function reviewSummaryText(review) {
+    if ((review.status || "done") === "done") {
+      return review.result?.summary || "无摘要";
+    }
+    return review.error || reviewStatusLabel(review);
+  }
+
+  function renderReview(review) {
+    if ((review.status || "done") !== "done") {
+      const status = review.status || "pending";
+      const waitingText =
+        status === "running"
+          ? "模型正在执行预审…"
+          : status === "pending"
+            ? "任务已排队，稍后自动执行。"
+            : reviewStatusLabel(review);
+      resultBox.innerHTML = `
+        <div class="review-summary status-${status}">
+          <span class="review-verdict status-${status}">${reviewStatusLabel(review)}</span>
+          <strong>${escapeHtml(review.error || waitingText)}</strong>
+          <span class="review-meta">
+            v${review.version_number ?? "-"} · ${review.source === "auto" ? "自动预审" : "手动预审"} · ${formatTime(review.created_at)}
+          </span>
+        </div>
+      `;
+      return;
+    }
+
+    const result = review.result || {};
+    const verdict = result.verdict || review.verdict || "unknown";
+    const issues = Array.isArray(result.issues) ? result.issues : [];
+    const specChecks = Array.isArray(result.spec_checks)
+      ? result.spec_checks
+      : [];
+    const changes = Array.isArray(result.changes) ? result.changes : [];
+
+    const issueHtml = issues.length
+      ? issues
+          .map((issue) => {
+            const severity = ["high", "medium", "low"].includes(issue.severity)
+              ? issue.severity
+              : "low";
+            const severityText = { high: "高", medium: "中", low: "低" }[
+              severity
+            ];
+            return `
+              <div class="review-issue severity-${severity}">
+                <div class="review-issue-head">
+                  <span class="severity-badge">${severityText}</span>
+                  <strong>${escapeHtml(issue.category || "其他")}</strong>
+                  ${issue.location ? `<span class="muted">${escapeHtml(issue.location)}</span>` : ""}
+                </div>
+                <p>${escapeHtml(issue.description || "")}</p>
+                ${issue.suggestion ? `<p class="review-suggestion">建议：${escapeHtml(issue.suggestion)}</p>` : ""}
+              </div>
+            `;
+          })
+          .join("")
+      : '<p class="muted">没有发现明确问题。</p>';
+
+    const specHtml = specChecks.length
+      ? `<ul class="review-check-list">${specChecks
+          .map(
+            (item) => `
+              <li>
+                <span class="check-mark ${item.compliant ? "ok" : "bad"}">${item.compliant ? "符合" : "不符合"}</span>
+                <strong>${escapeHtml(item.spec || "参考规范")}</strong>
+                ${item.note ? `<span class="muted">${escapeHtml(item.note)}</span>` : ""}
+              </li>
+            `
+          )
+          .join("")}</ul>`
+      : '<p class="muted">本次没有选择参考规范。</p>';
+
+    const changeHtml = changes.length
+      ? `<ul class="review-change-list">${changes
+          .map(
+            (item) => `
+              <li>
+                <strong>${escapeHtml(item.type || "变化")}</strong>
+                <span>${escapeHtml(item.description || "")}</span>
+              </li>
+            `
+          )
+          .join("")}</ul>`
+      : '<p class="muted">没有识别到明确的版本变化。</p>';
+
+    resultBox.innerHTML = `
+      <div class="review-summary ${verdictClass(verdict)}">
+        <span class="review-verdict">${verdictLabel(verdict)}</span>
+        <strong>${escapeHtml(result.summary || "模型没有给出摘要")}</strong>
+        <span class="review-meta">
+          v${review.version_number ?? "-"} · ${formatTime(review.created_at)}
+          ${result.context_truncated ? " · 正文已截断" : ""}
+        </span>
+      </div>
+      ${
+        result.parse_error
+          ? `<div class="notice"><div class="review-raw">模型返回的不是标准 JSON，下面是原文：\n${escapeHtml(result.summary || "")}</div></div>`
+          : ""
+      }
+      <div class="review-block"><h3>发现的问题</h3>${issueHtml}</div>
+      <div class="review-block"><h3>规范对照</h3>${specHtml}</div>
+      <div class="review-block"><h3>版本变化</h3>${changeHtml}</div>
+      <div class="review-decision">
+        <div class="field-label">人工确认</div>
+        ${
+          canReview
+            ? `
+              <p class="muted">AI 结论仅供参考，最终由负责人确认。</p>
+              <textarea id="humanReviewNote" rows="2" placeholder="可填写确认说明或退回原因">${escapeHtml(review.human_note || "")}</textarea>
+              <div class="actions">
+                <button class="btn btn-primary" type="button" data-human-decision="pass">通过</button>
+                <button class="btn btn-warning" type="button" data-human-decision="return">退回修改</button>
+                <span class="review-human-state">${humanDecisionLabel(review)}</span>
+              </div>
+            `
+            : `<p class="muted">${humanDecisionLabel(review)}</p>`
+        }
+      </div>
+    `;
+
+    if (canReview) {
+      resultBox
+        .querySelectorAll("[data-human-decision]")
+        .forEach((button) => {
+          button.addEventListener("click", async () => {
+            const decision = button.dataset.humanDecision;
+            const note =
+              resultBox.querySelector("#humanReviewNote")?.value.trim() || "";
+            if (decision === "return" && !note) {
+              alert("退回修改时请填写原因");
+              return;
+            }
+
+            resultBox
+              .querySelectorAll("[data-human-decision]")
+              .forEach((item) => {
+                item.disabled = true;
+              });
+
+            try {
+              const updated = await apiRequest(
+                `/api/documents/${doc.id}/ai/reviews/${review.id}/decision`,
+                {
+                  method: "PATCH",
+                  body: JSON.stringify({ decision, note }),
+                }
+              );
+              const index = loadedReviews.findIndex(
+                (item) => String(item.id) === String(updated.id)
+              );
+              if (index >= 0) {
+                loadedReviews[index] = updated;
+              }
+              renderReview(updated);
+              await loadReviewHistory();
+            } catch (error) {
+              alert(error.message);
+              resultBox
+                .querySelectorAll("[data-human-decision]")
+                .forEach((item) => {
+                  item.disabled = false;
+                });
+            }
+          });
+        });
+    }
+  }
+
+  let reviewRefreshTimer = null;
+
+  function renderReviewHistoryItem(review) {
+    const status = review.status || "done";
+    const verdict = review.result?.verdict || review.verdict || "unknown";
+    const label =
+      status === "done"
+        ? verdictLabel(verdict)
+        : reviewStatusLabel(review);
+    return `
+      <button type="button" class="review-history-item" data-review-id="${review.id}">
+        <span class="review-verdict ${reviewStatusClass(review)}">${label}</span>
+        <span>${escapeHtml(reviewSummaryText(review))}</span>
+        <span class="muted">v${review.version_number ?? "-"} · ${review.source === "auto" ? "自动" : "手动"} · ${humanDecisionLabel(review)} · ${formatTime(review.created_at)}</span>
+      </button>
+    `;
+  }
+
+  async function loadReviewHistory() {
+    try {
+      loadedReviews = await apiRequest(
+        `/api/documents/${doc.id}/ai/reviews?limit=5`
+      );
+      historyBox.classList.remove("muted");
+      historyBox.innerHTML = loadedReviews.length
+        ? loadedReviews.map(renderReviewHistoryItem).join("")
+        : '<span class="muted">还没有预审记录。</span>';
+      if (reviewRefreshTimer) {
+        clearTimeout(reviewRefreshTimer);
+        reviewRefreshTimer = null;
+      }
+      if (
+        loadedReviews.some((item) =>
+          ["pending", "running"].includes(item.status)
+        )
+      ) {
+        reviewRefreshTimer = window.setTimeout(loadReviewHistory, 5000);
+      }
+    } catch (error) {
+      historyBox.innerHTML = `<span class="notice">${escapeHtml(error.message)}</span>`;
+    }
+  }
+
+  historyBox.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-review-id]");
+    if (!button) {
+      return;
+    }
+    const review = loadedReviews.find(
+      (item) => String(item.id) === button.dataset.reviewId
+    );
+    if (review) {
+      renderReview(review);
+    }
+  });
+
+  reviewButton.addEventListener("click", async () => {
+    const checked = [
+      ...reviewSection.querySelectorAll('input[name="aiSpec"]:checked'),
+    ];
+    if (checked.length > 3) {
+      alert("参考规范最多选 3 份");
+      return;
+    }
+
+    reviewButton.disabled = true;
+    reviewButton.textContent = "预审中…";
+    resultBox.innerHTML =
+      '<div class="ai-status">模型正在对照文档和规范，可能需要一两分钟…</div>';
+
+    try {
+      const review = await apiRequest(
+        `/api/documents/${doc.id}/ai/review`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            version_id: current.id,
+            spec_document_ids: checked.map((item) => Number(item.value)),
+          }),
+        }
+      );
+      renderReview(review);
+      await loadReviewHistory();
+    } catch (error) {
+      resultBox.innerHTML = `<div class="notice">${escapeHtml(error.message)}</div>`;
+    } finally {
+      reviewButton.disabled = false;
+      reviewButton.textContent = "开始预审";
+    }
+  });
+
+  await loadReviewHistory();
+}
+
 
 async function initUpload() {
   await requireUser();
@@ -1310,6 +1764,7 @@ async function initManageCategories() {
   const cancelButton = document.getElementById("categoryCancelButton");
   const nameInput = document.getElementById("categoryName");
   const sortInput = document.getElementById("sortOrder");
+  const specBox = document.getElementById("defaultSpecOptions");
 
   if (user.role !== "admin") {
     createCard.style.display = "none";
@@ -1320,6 +1775,33 @@ async function initManageCategories() {
 
   let editingId = null;
   let currentCategories = [];
+  let allDocuments = [];
+
+  function renderSpecOptions(selectedIds = []) {
+    const selected = new Set((selectedIds || []).map(String));
+    const candidates = allDocuments.filter((item) => item.current_version);
+    specBox.innerHTML = candidates.length
+      ? candidates
+          .map(
+            (item) => `
+              <label class="spec-option">
+                <input type="checkbox" name="defaultSpec" value="${item.id}" ${selected.has(String(item.id)) ? "checked" : ""} />
+                <span>
+                  ${escapeHtml(item.title)}
+                  <small>${escapeHtml(item.category.name)} · v${item.current_version.version_number}</small>
+                </span>
+              </label>
+            `
+          )
+          .join("")
+      : '<span class="muted">还没有可选的文档，先上传文档后再配置。</span>';
+  }
+
+  function selectedSpecIds() {
+    return [
+      ...specBox.querySelectorAll('input[name="defaultSpec"]:checked'),
+    ].map((item) => Number(item.value));
+  }
 
   function resetForm() {
     editingId = null;
@@ -1328,6 +1810,7 @@ async function initManageCategories() {
     cancelButton.hidden = true;
     nameInput.value = "";
     sortInput.value = "0";
+    renderSpecOptions([]);
   }
 
   function renderActions(category) {
@@ -1353,6 +1836,7 @@ async function initManageCategories() {
         cancelButton.hidden = false;
         nameInput.value = category.name;
         sortInput.value = category.sort_order;
+        renderSpecOptions(category.default_spec_document_ids || []);
         createCard.scrollIntoView({ behavior: "smooth", block: "start" });
       });
     });
@@ -1386,6 +1870,7 @@ async function initManageCategories() {
                 <th>名称</th>
                 <th>排序</th>
                 <th>文档数</th>
+                <th>默认规范</th>
                 <th>创建时间</th>
                 <th>操作</th>
               </tr>
@@ -1398,6 +1883,13 @@ async function initManageCategories() {
                       <td>${escapeHtml(category.name)}</td>
                       <td>${escapeHtml(category.sort_order)}</td>
                       <td>${category.document_count}</td>
+                      <td>${
+                        category.default_spec_documents?.length
+                          ? category.default_spec_documents
+                              .map((item) => escapeHtml(item.title))
+                              .join("、")
+                          : '<span class="muted">未配置</span>'
+                      }</td>
                       <td>${formatTime(category.created_at)}</td>
                       <td class="actions">${renderActions(category)}</td>
                     </tr>
@@ -1414,6 +1906,13 @@ async function initManageCategories() {
     }
   }
 
+  try {
+    allDocuments = await apiRequest("/api/documents");
+    renderSpecOptions([]);
+  } catch (error) {
+    specBox.innerHTML = `<span class="notice">${escapeHtml(error.message)}</span>`;
+  }
+
   await reload();
 
   cancelButton.addEventListener("click", resetForm);
@@ -1428,10 +1927,20 @@ async function initManageCategories() {
       return;
     }
 
+    const defaultSpecIds = selectedSpecIds();
+    if (defaultSpecIds.length > 3) {
+      alert("默认规范最多选 3 份");
+      return;
+    }
+
     submitButton.disabled = true;
     submitButton.textContent = editingId ? "保存中..." : "创建中...";
     try {
-      const body = JSON.stringify({ name, sort_order: Number(sortOrder) || 0 });
+      const body = JSON.stringify({
+        name,
+        sort_order: Number(sortOrder) || 0,
+        default_spec_document_ids: defaultSpecIds,
+      });
       if (editingId) {
         await apiRequest(`/api/categories/${editingId}`, {
           method: "PATCH",
