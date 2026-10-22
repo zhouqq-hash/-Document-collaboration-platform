@@ -8,15 +8,15 @@
   margin-bottom: 16px;
 }
 
-/* 话题状态徽标（复用 .status-badge 的形状，补两个新状态色） */
+/* 话题状态徽标（复用 .status-badge 的形状，补两个状态色） */
 .status-open {
-  background: #e6f6ec;
-  color: #1e7a45;
+  background: var(--ok-bg);
+  color: var(--ok-text);
 }
 
 .status-closed {
-  background: #f1f5f9;
-  color: #64748b;
+  background: #f0f0ed;
+  color: #6a706f;
 }
 
 /* 立场徽标 */
@@ -24,39 +24,40 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 2px 10px;
-  border-radius: 999px;
+  padding: 2px 9px;
+  border-radius: 3px;
   font-size: 12px;
-  font-weight: 500;
+  font-weight: 600;
   line-height: 1.6;
   white-space: nowrap;
 }
 
 .position-badge.position-agree {
-  background: #e6f6ec;
-  color: #1e7a45;
+  background: var(--ok-bg);
+  color: var(--ok-text);
 }
 
 .position-badge.position-disagree {
-  background: #fdeaea;
-  color: #b42318;
+  background: var(--cinnabar-soft);
+  color: var(--cinnabar-deep);
 }
 
 .position-badge.position-neutral {
-  background: #fdf4e3;
-  color: #92500e;
+  background: var(--warn-bg);
+  color: var(--warn-text);
 }
 
 /* 意见汇总 */
 .summary-card h2,
 .timeline-card h2 {
   margin: 0 0 14px;
+  font-family: var(--font-display);
   font-size: 17px;
   font-weight: 600;
+  letter-spacing: 0.01em;
   color: var(--heading);
 }
 
-/* 标题与结论标签同一行：标题在左，标签靠右 */
 .summary-head {
   display: flex;
   align-items: center;
@@ -75,9 +76,9 @@
   align-items: center;
   gap: 6px;
   padding: 4px 12px;
-  border-radius: 999px;
+  border-radius: 3px;
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 600;
   line-height: 1.6;
   white-space: nowrap;
 }
@@ -85,20 +86,20 @@
 .summary-verdict::before {
   content: "";
   flex: none;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
+  width: 7px;
+  height: 7px;
+  border-radius: 2px;
   background: currentColor;
 }
 
 .summary-verdict.is-ok {
-  background: #e6f6ec;
-  color: #1e7a45;
+  background: var(--ok-bg);
+  color: var(--ok-text);
 }
 
 .summary-verdict.is-pending {
-  background: #fdf4e3;
-  color: #92500e;
+  background: var(--warn-bg);
+  color: var(--warn-text);
 }
 
 .summary-text {
@@ -133,28 +134,27 @@
 .summary-bar-track {
   flex: 1;
   height: 8px;
-  border-radius: 999px;
-  background: var(--border);
+  border-radius: 2px;
+  background: var(--line);
   overflow: hidden;
 }
 
 .summary-bar-fill {
   display: block;
   height: 100%;
-  border-radius: 999px;
   transition: width var(--t) var(--ease);
 }
 
 .summary-bar-fill.position-agree {
-  background: #2f9e5f;
+  background: #4c8a64;
 }
 
 .summary-bar-fill.position-disagree {
-  background: #d1493f;
+  background: var(--cinnabar);
 }
 
 .summary-bar-fill.position-neutral {
-  background: #d99a35;
+  background: #b98a3f;
 }
 
 .summary-bar-count {
@@ -174,9 +174,9 @@
 
 .timeline-item {
   padding: 14px 16px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--line);
   border-radius: var(--radius-sm);
-  background: var(--bg);
+  background: var(--surface-2);
 }
 
 .timeline-head {
@@ -216,7 +216,7 @@
 .qa-filters input[type="search"],
 .qa-filters select {
   padding: 8px 12px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--line);
   border-radius: var(--radius-sm);
   background: #fff;
   font-size: 14px;
@@ -235,8 +235,8 @@
 .qa-filters input[type="search"]:focus,
 .qa-filters select:focus {
   outline: none;
-  border-color: var(--brand-500);
-  box-shadow: 0 0 0 3px rgba(59, 118, 191, 0.16);
+  border-color: var(--ink);
+  box-shadow: 0 0 0 3px rgba(52, 91, 125, 0.14);
 }
 
 /* 话题列表分页 */
@@ -277,15 +277,15 @@
 /* 管理员隐藏（软删除）的发言 */
 .hidden-badge {
   padding: 1px 8px;
-  border-radius: 999px;
-  background: #f1f5f9;
-  color: #64748b;
+  border-radius: 3px;
+  background: #f0f0ed;
+  color: #6a706f;
   font-size: 12px;
   white-space: nowrap;
 }
 
 .timeline-item.is-hidden {
-  background: #fbfbfc;
+  background: #fbfbfa;
   border-style: dashed;
 }
 
@@ -300,7 +300,7 @@
 }
 
 .link-btn-danger {
-  color: #b42318;
+  color: var(--cinnabar-deep);
 }
 
 /* 顶栏的未读/待处理徽标 */
@@ -317,8 +317,8 @@
   min-width: 18px;
   height: 18px;
   padding: 0 5px;
-  border-radius: 999px;
-  background: #d1493f;
+  border-radius: 3px;
+  background: var(--cinnabar);
   color: #fff;
   font-size: 11px;
   font-weight: 600;
@@ -333,9 +333,9 @@
 .report-form {
   margin-bottom: 16px;
   padding: 14px 16px;
-  border: 1px dashed var(--border-strong);
+  border: 1px dashed var(--line-strong);
   border-radius: var(--radius-sm);
-  background: #fffaf5;
+  background: #fcfaf5;
 }
 
 .report-form-head {
@@ -349,7 +349,7 @@
 .report-form textarea {
   width: 100%;
   padding: 10px 12px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--line);
   border-radius: var(--radius-sm);
   font-family: inherit;
   font-size: 14px;
@@ -367,7 +367,7 @@
 
 .notification-item {
   padding: 14px 0;
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--line);
 }
 
 .notification-item:first-child {
@@ -376,7 +376,7 @@
 }
 
 .notification-item.is-unread {
-  border-left: 3px solid var(--brand-500);
+  border-left: 3px solid var(--cinnabar);
   padding-left: 12px;
   margin-left: -12px;
 }
@@ -391,9 +391,9 @@
 
 .notification-kind {
   padding: 1px 8px;
-  border-radius: 999px;
-  background: var(--brand-50);
-  color: var(--brand-700);
+  border-radius: 3px;
+  background: var(--ink-soft);
+  color: var(--ink-deep);
   font-size: 12px;
 }
 
@@ -407,7 +407,7 @@
 /* 举报处理队列 */
 .report-card {
   padding: 16px 0;
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--line);
 }
 
 .report-card:first-child {
@@ -430,7 +430,7 @@
 }
 
 .report-head a:hover {
-  color: var(--brand-700);
+  color: var(--ink-deep);
 }
 
 .report-reason {
@@ -444,9 +444,9 @@
   display: inline-flex;
   align-items: center;
   padding: 2px 10px;
-  border-radius: 999px;
-  background: #eef4fc;
-  color: #2f5f9e;
+  border-radius: 3px;
+  background: var(--ink-soft);
+  color: var(--ink-deep);
   font-size: 12px;
   line-height: 1.6;
   white-space: nowrap;
@@ -462,7 +462,7 @@
   max-width: 220px;
   margin-right: 6px;
   padding: 6px 10px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--line);
   border-radius: var(--radius-sm);
   font-size: 14px;
   color: var(--text);
@@ -472,10 +472,10 @@
 .reply-context {
   margin-bottom: 12px;
   padding: 10px 12px;
-  border: 1px solid var(--border);
-  border-left: 3px solid var(--brand-500);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--ink);
   border-radius: var(--radius-sm);
-  background: var(--brand-50);
+  background: var(--ink-soft);
 }
 
 .reply-context-head {
@@ -489,9 +489,9 @@
 .quote-preview {
   margin: 0;
   padding: 8px 10px;
-  border-left: 3px solid var(--border-strong);
-  border-radius: 4px;
-  background: #f8fafc;
+  border-left: 3px solid var(--line-strong);
+  border-radius: 3px;
+  background: var(--surface);
   color: var(--muted);
   font-size: 13px;
   white-space: pre-wrap;
@@ -517,7 +517,7 @@
   padding: 0;
   border: 0;
   background: none;
-  color: var(--brand-600);
+  color: var(--ink-strong);
   font-size: 13px;
   cursor: pointer;
 }
@@ -530,7 +530,7 @@
 .ai-summary {
   margin-top: 16px;
   padding-top: 14px;
-  border-top: 1px dashed var(--border);
+  border-top: 1px dashed var(--line-strong);
 }
 
 .ai-summary-head {
@@ -547,10 +547,10 @@
 .ai-summary-panel {
   margin-top: 12px;
   padding: 12px 14px;
-  border: 1px solid var(--border);
-  border-left: 3px solid var(--brand-500);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--ink);
   border-radius: var(--radius-sm);
-  background: #fbfdff;
+  background: var(--surface-2);
   font-size: 14px;
   line-height: 1.8;
   white-space: pre-wrap;
@@ -568,10 +568,10 @@
 .conclusion {
   margin-top: 16px;
   padding: 14px 16px;
-  border: 1px solid var(--border);
-  border-left: 3px solid #2f9e5f;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--ok-line);
   border-radius: var(--radius-sm);
-  background: #f4fbf6;
+  background: var(--ok-bg);
 }
 
 .conclusion-empty {
@@ -579,8 +579,8 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  border-left-color: var(--border-strong);
-  background: #f8fafc;
+  border-left-color: var(--line-strong);
+  background: var(--surface-2);
 }
 
 .conclusion-head {
@@ -593,6 +593,7 @@
 
 .conclusion-head h3 {
   margin: 0;
+  font-family: var(--font-display);
   font-size: 15px;
   font-weight: 600;
   color: var(--heading);
@@ -616,9 +617,9 @@
 .conclusion-form {
   margin-top: 16px;
   padding: 14px 16px;
-  border: 1px dashed var(--border-strong);
+  border: 1px dashed var(--line-strong);
   border-radius: var(--radius-sm);
-  background: #fbfdff;
+  background: var(--surface-2);
 }
 
 .conclusion-form label {
@@ -632,7 +633,7 @@
 .conclusion-form textarea {
   width: 100%;
   padding: 10px 12px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--line);
   border-radius: var(--radius-sm);
   font-family: inherit;
   font-size: 14px;

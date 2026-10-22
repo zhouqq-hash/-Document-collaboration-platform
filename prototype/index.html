@@ -6,31 +6,39 @@
     <title>工作台 · 教学文档协作平台</title>
     <style>
       /*
-       * 工作台首页样式：与 prototype/documents/styles.css 共用同一套设计基线
-       * （主色阶、圆角、阴影、间距、动效）。本页是独立静态页，所以内联一份，
-       * 新增页面时请对齐这里的取值。
+       * 工作台首页样式（墨档 · 朱批）：与 prototype/documents/styles.css 共用同一套
+       * 设计基线。本页是独立静态页，所以内联一份。
        */
       :root {
-        --brand-50: #eef4fb;
-        --brand-100: #dce8f6;
-        --brand-500: #3b76bf;
-        --brand-600: #2f5f9e;
-        --brand-700: #1f4473;
-        --accent: #e8a33d;
-        --text: #1f2937;
-        --heading: #14243d;
-        --muted: #64748b;
-        --border: #e3e8ef;
-        --bg: #f4f7fb;
-        --surface: #fff;
-
-        --radius-sm: 8px;
-        --radius: 12px;
-        --shadow-card: 0 1px 2px rgba(15, 23, 42, 0.04);
-        --shadow-hover: 0 12px 28px rgba(15, 23, 42, 0.1);
+        --paper: #f6f5f1;
+        --surface: #fffefb;
+        --surface-2: #fbfaf6;
+        --line: #e4e1d8;
+        --line-strong: #d1cdc1;
+        --ink-soft: #edf2f6;
+        --ink-tint: #d9e3ec;
+        --ink: #345b7d;
+        --ink-strong: #284c6b;
+        --ink-deep: #1e3a53;
+        --cinnabar: #b13a2c;
+        --cinnabar-deep: #942f23;
+        --text: #2b323a;
+        --heading: #1d2833;
+        --muted: #6c747e;
+        --border: var(--line);
+        --bg: var(--paper);
+        --radius-sm: 4px;
+        --radius: 6px;
+        --radius-lg: 10px;
+        --shadow-card: 0 1px 0 rgba(29, 40, 51, 0.03);
+        --shadow-hover: 0 10px 24px rgba(29, 40, 51, 0.08);
         --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
-        --t: 180ms;
-        --t-fast: 150ms;
+        --t: 170ms;
+        --t-fast: 140ms;
+        --font-display: "Source Han Serif SC", "Noto Serif SC", "STZhongsong",
+          "STSong", "SimSun", "Songti SC", serif;
+        --font-sans: "Segoe UI", "Microsoft YaHei", "PingFang SC",
+          "Hiragino Sans GB", sans-serif;
       }
 
       * {
@@ -40,22 +48,25 @@
       body {
         margin: 0;
         min-height: 100vh;
-        font-family: "Segoe UI", "Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", sans-serif;
+        font-family: var(--font-sans);
         font-size: 15px;
-        line-height: 1.65;
+        line-height: 1.7;
         color: var(--text);
         background-color: var(--bg);
-        background-image: radial-gradient(1100px 400px at 50% -180px, var(--brand-50), rgba(238, 244, 251, 0) 70%);
+        background-image: linear-gradient(
+          180deg,
+          rgba(255, 255, 255, 0.55),
+          rgba(255, 255, 255, 0) 280px
+        );
         background-repeat: no-repeat;
-        background-attachment: fixed;
       }
 
       ::selection {
-        background: rgba(59, 118, 191, 0.18);
+        background: rgba(177, 58, 44, 0.16);
       }
 
       :focus-visible {
-        outline: 3px solid rgba(59, 118, 191, 0.35);
+        outline: 2px solid var(--ink);
         outline-offset: 2px;
       }
 
@@ -64,21 +75,21 @@
         align-items: center;
         justify-content: space-between;
         gap: 24px;
-        padding: 12px 32px;
-        background: rgba(255, 255, 255, 0.94);
-        backdrop-filter: saturate(180%) blur(8px);
-        border-bottom: 1px solid var(--border);
-        box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
+        padding: 10px 32px;
+        background: rgba(255, 254, 251, 0.96);
+        backdrop-filter: blur(6px);
+        border-bottom: 1px solid var(--line);
       }
 
       .brand {
         display: inline-flex;
         align-items: center;
         gap: 10px;
-        font-size: 17px;
-        font-weight: 700;
-        letter-spacing: 0.01em;
-        color: var(--brand-700);
+        font-family: var(--font-display);
+        font-size: 18px;
+        font-weight: 600;
+        letter-spacing: 0.02em;
+        color: var(--ink-deep);
       }
 
       .brand-mark {
@@ -86,8 +97,7 @@
         flex: none;
         width: 28px;
         height: 28px;
-        border-radius: 9px;
-        box-shadow: 0 4px 10px rgba(47, 95, 158, 0.28);
+        border-radius: 8px;
       }
 
       .topbar-user {
@@ -100,19 +110,20 @@
         display: inline-flex;
         align-items: center;
         gap: 6px;
-        padding: 4px 12px;
-        border-radius: 999px;
-        background: var(--brand-50);
-        color: var(--brand-700);
+        padding: 5px 12px;
+        border-radius: 4px;
+        border: 1px solid var(--line);
+        background: var(--surface);
+        color: var(--ink-deep);
         font-size: 13px;
-        font-weight: 600;
+        font-weight: 500;
       }
 
       .btn-logout {
         padding: 6px 12px;
-        border: 1px solid var(--border);
+        border: 1px solid var(--line);
         border-radius: var(--radius-sm);
-        background: #fff;
+        background: var(--surface);
         color: var(--text);
         font-size: 13px;
         cursor: pointer;
@@ -120,8 +131,8 @@
       }
 
       .btn-logout:hover {
-        border-color: var(--brand-100);
-        color: var(--brand-700);
+        border-color: var(--line-strong);
+        color: var(--ink-deep);
       }
 
       .container {
@@ -132,27 +143,18 @@
       }
 
       .page-head {
-        position: relative;
-        padding-left: 16px;
-        margin: 0 0 28px;
-      }
-
-      .page-head::before {
-        content: "";
-        position: absolute;
-        left: 0;
-        top: 4px;
-        bottom: 4px;
-        width: 4px;
-        border-radius: 999px;
-        background: linear-gradient(180deg, var(--brand-500), var(--brand-700));
+        margin: 0 0 24px;
+        padding-bottom: 18px;
+        border-bottom: 1px solid var(--line);
       }
 
       h1 {
         margin: 0 0 6px;
+        font-family: var(--font-display);
         font-size: 28px;
         font-weight: 600;
-        letter-spacing: -0.01em;
+        letter-spacing: 0.01em;
+        line-height: 1.25;
         color: var(--heading);
       }
 
@@ -166,78 +168,100 @@
         color: var(--muted);
       }
 
-      /* 顶部数据概览 */
-      .stats {
+      /* 顶部数据概览：一条台账，三格数字，发丝线分隔 */
+      .ledger {
         display: grid;
         grid-template-columns: repeat(3, minmax(0, 1fr));
-        gap: 16px;
         margin-bottom: 24px;
-      }
-
-      .stat {
-        padding: 18px 20px;
         background: var(--surface);
-        border: 1px solid var(--border);
+        border: 1px solid var(--line);
         border-radius: var(--radius);
         box-shadow: var(--shadow-card);
+        overflow: hidden;
       }
 
-      .stat-value {
+      .ledger-cell {
+        padding: 18px 22px;
+      }
+
+      .ledger-cell + .ledger-cell {
+        border-left: 1px solid var(--line);
+      }
+
+      .ledger-value {
         display: block;
-        font-size: 26px;
-        font-weight: 700;
-        line-height: 1.2;
-        color: var(--brand-700);
+        font-family: var(--font-display);
+        font-size: 30px;
+        font-weight: 600;
+        line-height: 1.15;
+        color: var(--ink-deep);
         font-variant-numeric: tabular-nums;
       }
 
-      .stat-label {
+      .ledger-label {
         font-size: 13px;
         color: var(--muted);
       }
 
       .grid {
         display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 20px;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 18px;
       }
 
       .card {
         position: relative;
-        display: block;
-        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
         padding: 24px;
         background: var(--surface);
-        border: 1px solid var(--border);
+        border: 1px solid var(--line);
         border-radius: var(--radius);
         box-shadow: var(--shadow-card);
         color: inherit;
         text-decoration: none;
-        transition: box-shadow var(--t) var(--ease), transform var(--t) var(--ease),
-          border-color var(--t) var(--ease);
-      }
-
-      .card::after {
-        content: "";
-        position: absolute;
-        inset: 0 0 auto 0;
-        height: 4px;
-        background: linear-gradient(90deg, var(--brand-500), var(--brand-100));
+        transition: box-shadow var(--t) var(--ease), border-color var(--t) var(--ease);
       }
 
       .card:hover {
-        transform: translateY(-3px);
-        border-color: var(--brand-100);
+        border-color: var(--line-strong);
         box-shadow: var(--shadow-hover);
+      }
+
+      .tag {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        width: fit-content;
+        padding: 2px 9px;
+        border-radius: 3px;
+        font-size: 12px;
+        font-weight: 600;
+      }
+
+      .tag::before {
+        content: "";
+        width: 6px;
+        height: 6px;
+        border-radius: 1px;
+        background: currentColor;
+      }
+
+      .tag-count {
+        background: var(--ink-soft);
+        color: var(--ink-deep);
       }
 
       .card h2 {
         display: flex;
         align-items: center;
         gap: 10px;
-        margin: 0 0 12px;
-        font-size: 18px;
+        margin: 0;
+        font-family: var(--font-display);
+        font-size: 19px;
         font-weight: 600;
+        letter-spacing: 0.01em;
         color: var(--heading);
       }
 
@@ -249,7 +273,7 @@
       }
 
       .card p {
-        margin: 0 0 16px;
+        margin: 0;
         font-size: 14px;
         color: var(--muted);
       }
@@ -258,33 +282,10 @@
         display: inline-flex;
         align-items: center;
         gap: 6px;
+        margin-top: auto;
         font-size: 13px;
         font-weight: 600;
-        color: var(--brand-600);
-      }
-
-      .tag {
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        margin-bottom: 12px;
-        padding: 2px 10px;
-        border-radius: 999px;
-        font-size: 12px;
-        font-weight: 500;
-      }
-
-      .tag::before {
-        content: "";
-        width: 6px;
-        height: 6px;
-        border-radius: 50%;
-        background: currentColor;
-      }
-
-      .tag-count {
-        background: var(--brand-50);
-        color: var(--brand-700);
+        color: var(--ink-strong);
       }
 
       /* 最近动态 */
@@ -298,29 +299,33 @@
       .panel {
         padding: 20px 22px;
         background: var(--surface);
-        border: 1px solid var(--border);
+        border: 1px solid var(--line);
         border-radius: var(--radius);
         box-shadow: var(--shadow-card);
       }
 
       .panel-head {
         display: flex;
-        align-items: center;
+        align-items: baseline;
         justify-content: space-between;
         gap: 12px;
         margin-bottom: 10px;
+        padding-bottom: 10px;
+        border-bottom: 1px solid var(--line);
       }
 
       .panel-head h2 {
         margin: 0;
-        font-size: 16px;
+        font-family: var(--font-display);
+        font-size: 17px;
         font-weight: 600;
+        letter-spacing: 0.01em;
         color: var(--heading);
       }
 
       .panel-head a {
         font-size: 13px;
-        color: var(--brand-600);
+        color: var(--ink-strong);
         text-decoration: none;
       }
 
@@ -340,7 +345,7 @@
         justify-content: space-between;
         gap: 12px;
         padding: 10px 0;
-        border-top: 1px solid var(--border);
+        border-top: 1px solid var(--line);
       }
 
       .recent-item:first-child {
@@ -358,7 +363,7 @@
       }
 
       .recent-item a:hover {
-        color: var(--brand-700);
+        color: var(--ink-deep);
       }
 
       .recent-sub {
@@ -381,13 +386,12 @@
         align-items: flex-start;
         gap: 12px;
         margin-top: 24px;
-        padding: 16px 20px;
+        padding: 14px 18px;
         font-size: 14px;
         line-height: 1.8;
-        color: var(--brand-700);
-        background: rgba(255, 255, 255, 0.85);
-        border: 1px solid var(--brand-100);
-        border-left: 4px solid var(--brand-500);
+        color: var(--ink-deep);
+        background: var(--ink-soft);
+        border: 1px solid var(--ink-tint);
         border-radius: var(--radius);
       }
 
@@ -396,6 +400,7 @@
         width: 18px;
         height: 18px;
         margin-top: 3px;
+        color: var(--ink);
       }
 
       @keyframes page-in {
@@ -424,16 +429,10 @@
     <header class="topbar">
       <span class="brand">
         <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
-          <defs>
-            <linearGradient id="brandMarkGradient" x1="0" y1="0" x2="1" y2="1">
-              <stop offset="0%" stop-color="#4b86cf" />
-              <stop offset="100%" stop-color="#1f4473" />
-            </linearGradient>
-          </defs>
-          <rect width="32" height="32" rx="9" fill="url(#brandMarkGradient)" />
-          <path d="M12.2 7.5h6.1L22 11.2V23a1.6 1.6 0 0 1-1.6 1.6h-8.2A1.6 1.6 0 0 1 10.6 23V9.1A1.6 1.6 0 0 1 12.2 7.5Z" fill="#ffffff" />
-          <path d="M18.3 7.5 22 11.2h-3.7z" fill="#c9dcf3" />
-          <path d="M13.8 15.2h5.4M13.8 18.6h5.4" fill="none" stroke="#3b76bf" stroke-width="1.5" stroke-linecap="round" />
+          <rect width="32" height="32" rx="8" fill="#b13a2c" />
+          <path d="M11.6 7.6h6.2l3.4 3.5v12.2a1.7 1.7 0 0 1-1.7 1.7h-7.9A1.7 1.7 0 0 1 10 23.3V9.3a1.7 1.7 0 0 1 1.6-1.7Z" fill="#fff7ef" />
+          <path d="M17.8 7.6 21.2 11h-3.4z" fill="#e9c9bd" />
+          <path d="M13.6 15h5.6M13.6 18.4h5.6" fill="none" stroke="#b13a2c" stroke-width="1.6" stroke-linecap="round" />
         </svg>
         <span>教学文档协作平台</span>
       </span>
@@ -446,18 +445,18 @@
         <p class="subtitle" id="welcomeText">正在加载…</p>
       </header>
 
-      <section class="stats">
-        <div class="stat">
-          <span class="stat-value" id="statDocuments">–</span>
-          <span class="stat-label">教学文档</span>
+      <section class="ledger">
+        <div class="ledger-cell">
+          <span class="ledger-value" id="statDocuments">–</span>
+          <span class="ledger-label">教学文档</span>
         </div>
-        <div class="stat">
-          <span class="stat-value" id="statTopics">–</span>
-          <span class="stat-label">讨论话题</span>
+        <div class="ledger-cell">
+          <span class="ledger-value" id="statTopics">–</span>
+          <span class="ledger-label">讨论话题</span>
         </div>
-        <div class="stat">
-          <span class="stat-value" id="statOpenTopics">–</span>
-          <span class="stat-label">讨论中</span>
+        <div class="ledger-cell">
+          <span class="ledger-value" id="statOpenTopics">–</span>
+          <span class="ledger-label">讨论中</span>
         </div>
       </section>
 
@@ -466,42 +465,42 @@
           <span class="tag tag-count" id="tagDocuments">文档管理</span>
           <h2>
             <svg class="card-icon" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
-              <rect width="32" height="32" rx="9" fill="#eef4fb" />
-              <path d="M11.5 8h6.4l3.6 3.7V23a1.5 1.5 0 0 1-1.5 1.5h-8.5A1.5 1.5 0 0 1 10 23V9.5A1.5 1.5 0 0 1 11.5 8Z" fill="#ffffff" stroke="#3b76bf" stroke-width="1.2" />
-              <path d="M13.4 15.1h5.2M13.4 18.3h5.2" stroke="#3b76bf" stroke-width="1.4" stroke-linecap="round" />
+              <path d="M11.5 8h6.4l3.6 3.7V23a1.5 1.5 0 0 1-1.5 1.5h-8.5A1.5 1.5 0 0 1 10 23V9.5A1.5 1.5 0 0 1 11.5 8Z" fill="none" stroke="#1e3a53" stroke-width="1.5" />
+              <path d="M18 8l3.5 3.7H18z" fill="#b13a2c" opacity="0.9" />
+              <path d="M13.4 15.1h5.2M13.4 18.3h5.2" stroke="#1e3a53" stroke-width="1.5" stroke-linecap="round" />
             </svg>
             <span>文档管理</span>
           </h2>
           <p>按分类维护教学文档，跟踪负责人、当前版本与历史版本。</p>
-          <span class="card-more">进入模块 →</span>
+          <span class="card-more">进入模块</span>
         </a>
 
         <a class="card" href="qa/index.html">
           <span class="tag tag-count" id="tagTopics">问答讨论</span>
           <h2>
             <svg class="card-icon" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
-              <rect width="32" height="32" rx="9" fill="#eef4fb" />
-              <path d="M7 9.5A1.5 1.5 0 0 1 8.5 8h15A1.5 1.5 0 0 1 25 9.5v8a1.5 1.5 0 0 1-1.5 1.5H16l-4.6 4.6v-4.6H8.5A1.5 1.5 0 0 1 7 17.5z" fill="#ffffff" stroke="#3b76bf" stroke-width="1.2" />
-              <path d="M11.5 12.5h9M11.5 16h5" stroke="#3b76bf" stroke-width="1.4" stroke-linecap="round" />
+              <path d="M7 9.5A1.5 1.5 0 0 1 8.5 8h15A1.5 1.5 0 0 1 25 9.5v8a1.5 1.5 0 0 1-1.5 1.5H16l-4.6 4.6v-4.6H8.5A1.5 1.5 0 0 1 7 17.5z" fill="none" stroke="#1e3a53" stroke-width="1.5" />
+              <path d="M11.5 12.5h9M11.5 16h5" stroke="#1e3a53" stroke-width="1.5" stroke-linecap="round" />
+              <circle cx="25" cy="8" r="2.4" fill="#b13a2c" />
             </svg>
             <span>问答讨论</span>
           </h2>
           <p>发起话题、按时间线聚合发言、自动汇总意见，并可与文档关联。</p>
-          <span class="card-more">进入模块 →</span>
+          <span class="card-more">进入模块</span>
         </a>
 
         <a class="card" href="table/index.html">
           <span class="tag tag-count" id="tagTables">表格协作</span>
           <h2>
             <svg class="card-icon" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
-              <rect width="32" height="32" rx="9" fill="#eef4fb" />
-              <path d="M7 9.5A1.5 1.5 0 0 1 8.5 8h15A1.5 1.5 0 0 1 25 9.5v13a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 7 22.5z" fill="#ffffff" stroke="#3b76bf" stroke-width="1.2" />
-              <path d="M7 13.5h18M11 8v16M11 13.5h5M11 18.5h8" stroke="#3b76bf" stroke-width="1.3" stroke-linecap="round" />
+              <path d="M7 9.5A1.5 1.5 0 0 1 8.5 8h15A1.5 1.5 0 0 1 25 9.5v13a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 7 22.5z" fill="none" stroke="#1e3a53" stroke-width="1.5" />
+              <path d="M7 13.5h18M11 8v16" stroke="#1e3a53" stroke-width="1.5" />
+              <rect x="12.5" y="15" width="5" height="3" rx="0.5" fill="#b13a2c" />
             </svg>
             <span>表格协作</span>
           </h2>
           <p>多人行内编辑表格，自动记录修改，支持快照与一键回滚。</p>
-          <span class="card-more">进入模块 →</span>
+          <span class="card-more">进入模块</span>
         </a>
       </div>
 
@@ -524,9 +523,9 @@
 
       <div class="note">
         <svg class="note-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false">
-          <circle cx="12" cy="12" r="9" stroke="#2f5f9e" stroke-width="1.8" />
-          <path d="M12 11v6" stroke="#2f5f9e" stroke-width="1.8" stroke-linecap="round" />
-          <circle cx="12" cy="7.6" r="1.1" fill="#2f5f9e" />
+          <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.8" />
+          <path d="M12 11v6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+          <circle cx="12" cy="7.6" r="1.1" fill="currentColor" />
         </svg>
         <span>
           话题可以关联到具体文档（甚至某个版本），文档详情页会反向列出相关讨论，方便围绕文档做决策。
@@ -597,7 +596,6 @@
                 })
                   .catch(function () {})
                   .then(function () {
-                    // 带上 next=/，退出后重新登录仍回到工作台
                     window.location.replace("/documents/index.html?next=/");
                   });
               });
@@ -656,7 +654,6 @@
 
         var topicStats = { total: null, open: null };
 
-        // 话题列表分页了，卡片上的数量用接口返回的 total，不靠当前页的长度
         function updateTopicTag() {
           var tag = document.getElementById("tagTopics");
           if (!tag || topicStats.total === null) {
