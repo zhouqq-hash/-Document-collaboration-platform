@@ -211,6 +211,24 @@ flask --app backend/run.py doctor --strict
   检查脚本会列出每个版本“可用 / 损坏 / 版本低”。如果 Python 3.11 也标记为损坏，
   说明该 Python 版本本身不完整，不要再复制旧环境；选择脚本标记为可用的版本重建，
   并把上方 `--python` 路径换成对应版本。旧环境只改名，不直接删除。
+
+  如果 `mkvirtualenv` 重建后 `python -m pip` 仍报同一错误，改用标准 `venv` 和另一个
+  可用版本，完全绕过 virtualenvwrapper：
+
+  ```bash
+  deactivate 2>/dev/null || true
+  mv ~/.virtualenvs/doc-collab-env \
+    ~/.virtualenvs/doc-collab-env-broken-$(date +%Y%m%d%H%M%S)
+  /usr/bin/python3.13 -m venv ~/.virtualenvs/doc-collab-env-313
+  source ~/.virtualenvs/doc-collab-env-313/bin/activate
+  python -c "import subprocess, _posixsubprocess; print('venv-ok')"
+  python -m ensurepip --upgrade
+  python -m pip install -r ~/doc-collab/backend/requirements.txt
+  ```
+
+  Web 页面的 Virtualenv 同步改为
+  `/home/<用户名>/.virtualenvs/doc-collab-env-313`。如果 3.13 标准 venv 仍缺扩展，
+  用检查脚本中另一个“可用”版本替代 `/usr/bin/python3.13`。
 - 克隆提示目录已存在：进入旧目录检查 `git status` / `git remote -v`，通过 `git pull --ff-only`
   更新；不要直接覆盖或删除旧目录。
 - `ModuleNotFoundError: app`：检查 `~/doc-collab/backend` 是否存在。
