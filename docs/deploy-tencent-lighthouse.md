@@ -32,12 +32,13 @@ DNS 生效后再申请证书；可用 `ping docs.example.com` 或
 
 ## 3. 安装 Docker
 
-如果购买时选择 Docker CE 镜像，可跳过安装步骤。否则使用 Docker 官方仓库安装
-Docker Engine 和 Compose v2，并把当前用户加入 docker 组：
+如果购买时选择 Docker CE 镜像，可跳过安装步骤。Ubuntu 24.04 可以直接安装 Docker
+Engine 和 Compose v2，并把当前用户加入 docker 组：
 
 ```bash
 sudo apt update
-sudo apt install -y git curl ca-certificates
+sudo apt install -y git curl ca-certificates docker.io docker-compose-v2
+sudo systemctl enable --now docker
 sudo usermod -aG docker "$USER"
 newgrp docker
 docker version
@@ -45,6 +46,23 @@ docker compose version
 ```
 
 香港或大陆服务器均可访问 Docker Hub；若拉取镜像慢，可在腾讯云控制台为 Docker 配置镜像加速。
+如果系统源找不到 `docker-compose-v2`，按 Docker 官方文档配置 Docker 仓库后再安装。
+
+### 2 GB 内存套餐启用 Swap
+
+如果购买 2核2G 套餐，建议在首次构建镜像前增加 2 GB Swap，避免 Python 依赖安装时触发
+内存不足：
+
+```bash
+sudo fallocate -l 2G /swapfile
+sudo chmod 600 /swapfile
+sudo mkswap /swapfile
+sudo swapon /swapfile
+echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+free -h
+```
+
+4 GB 套餐通常不需要这一步。
 
 ## 4. 拉取代码并部署
 
