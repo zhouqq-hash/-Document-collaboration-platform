@@ -47,7 +47,7 @@
 | -------------------------- | ---------------------------------------------------- |
 | `cos-storage-guide.md`     | 切换到腾讯云 COS 存储的步骤与环境变量                                |
 | `deploy-render.md`         | Render 公网部署：持久盘、生产环境变量、管理员初始化、验证、备份与恢复            |
-| `deploy-pythonanywhere.md` | 部署到 PythonAnywhere 免费版（免信用卡）：注册、建环境、Web 配置、免费版能做/不能做 |
+| `deploy-pythonanywhere.md` | PythonAnywhere 免信用卡持久部署：生产环境、管理员、备份恢复、验证与限制 |
 | `production-runbook.md`    | 公网启动、权限边界、AI 降级、排障追踪、备份恢复与上线验收清单                   |
 | `../backend/README.md`     | 后端交付说明：运行环境、启动、演示账号、接口表、微信登录配置、学习重点                  |
 

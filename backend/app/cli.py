@@ -554,7 +554,11 @@ def register_commands(app):
             print(f"管理员 {username} 已存在，未修改密码。")
             return
         if not password:
-            raise click.ClickException("首次创建需要 BOOTSTRAP_ADMIN_PASSWORD")
+            password = click.prompt(
+                "Password",
+                hide_input=True,
+                confirmation_prompt=True,
+            )
         if len(password) < 12:
             raise click.ClickException("管理员密码至少需要 12 个字符")
 

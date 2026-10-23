@@ -10,7 +10,7 @@
 | 表格协作 | 空白创建、Excel / CSV 导入、行内编辑、公式重算、修改记录与版本回滚 | 登录用户协作，创建者和管理员管理 |
 | 问答讨论 | 话题筛选、高密度讨论流、关联文档与版本、时间线发言、意见汇总和最终结论     | 登录用户参与，管理员处理治理事项 |
 
-当前后端测试结果：**239 passed**。
+当前后端测试结果：**241 passed**。
 
 ## 界面预览
 
@@ -157,7 +157,8 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned
 
 部署步骤、环境变量、账号开通、备份恢复和故障处理见
 [`docs/deploy-render.md`](docs/deploy-render.md) 与
-[`docs/production-runbook.md`](docs/production-runbook.md)。
+[`docs/production-runbook.md`](docs/production-runbook.md)。没有可用的 Render 银行卡时，
+可使用免信用卡的 [`docs/deploy-pythonanywhere.md`](docs/deploy-pythonanywhere.md)。
 
 ## 查看原型
 
@@ -245,7 +246,7 @@ Stop-Process -Id <占用端口的 PID>
 当前完整测试集：
 
 ```text
-239 passed
+241 passed
 ```
 
 ## 数据库迁移

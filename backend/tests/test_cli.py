@@ -143,3 +143,17 @@ def test_create_user_prompts_for_password_without_putting_it_in_args(app):
         user = User.query.filter_by(username="teacher02").one()
         assert user.role == "teacher"
         assert user.check_password("strong-password-123")
+
+
+def test_bootstrap_admin_prompts_for_first_password(app, monkeypatch):
+    monkeypatch.delenv("BOOTSTRAP_ADMIN_PASSWORD", raising=False)
+    result = app.test_cli_runner().invoke(
+        args=["bootstrap-admin", "--username", "first-admin"],
+        input="bootstrap-password-123\nbootstrap-password-123\n",
+    )
+
+    assert result.exit_code == 0, result.output
+    with app.app_context():
+        user = User.query.filter_by(username="first-admin").one()
+        assert user.role == "admin"
+        assert user.check_password("bootstrap-password-123")

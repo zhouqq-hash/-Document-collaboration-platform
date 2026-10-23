@@ -1,30 +1,61 @@
-# PythonAnywhere 的 WSGI 配置模板
-#
-# 用法：把本文件的内容复制到 PythonAnywhere 的 WSGI 配置文件里
-#   /var/www/<你的用户名>_pythonanywhere_com_wsgi.py
-# 然后改两处：
-#   1) PROJECT_ROOT 改成仓库在你账号里的位置
-#   2) SECRET_KEY 换成你自己的一串随机字符
-#
-# 这个文件本身只是模板，真实密钥写在你账号的 /var/www/ 下，不会进仓库。
+"""PythonAnywhere WSGI template for the persistent, no-card deployment."""
 
 import os
+import secrets
 import sys
+from pathlib import Path
 
-# 仓库位置（PythonAnywhere 上的绝对路径）
-PROJECT_ROOT = os.path.expanduser("~/doc-collab")
-BACKEND_DIR = os.path.join(PROJECT_ROOT, "backend")
 
-# 生产环境密钥：必须在 import app 之前设置（config.py 在导入时读取）
-os.environ.setdefault("SECRET_KEY", "在这里填一串你自己的随机字符串")
-# 微信走演示模式：不配 WECHAT_APP_ID 就是演示模式，免费版外网受限，真机联调走不通。
-# AI 问答/自动预审需要外网，免费版也用不了，保持默认即可。
+# Paths can be overridden in the PythonAnywhere WSGI file.
+PROJECT_ROOT = Path(
+    os.path.expanduser(
+        os.environ.get("DOC_COLLAB_PROJECT_ROOT", "~/doc-collab")
+    )
+).resolve()
+DATA_ROOT = Path(
+    os.path.expanduser(
+        os.environ.get("DOC_COLLAB_DATA_ROOT", "~/doc-collab-data")
+    )
+).resolve()
+BACKEND_DIR = PROJECT_ROOT / "backend"
+DATA_ROOT.mkdir(parents=True, exist_ok=True)
 
-# 让 `from app import create_app` 能找到包，等同于本地 `python backend/run.py`
-if BACKEND_DIR not in sys.path:
-    sys.path.insert(0, BACKEND_DIR)
+# Generate the session secret once and keep it on the persistent account disk.
+SECRET_PATH = DATA_ROOT / "secret_key"
+if not SECRET_PATH.exists():
+    try:
+        descriptor = os.open(
+            SECRET_PATH,
+            os.O_WRONLY | os.O_CREAT | os.O_EXCL,
+            0o600,
+        )
+    except FileExistsError:
+        pass
+    else:
+        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+            handle.write(secrets.token_urlsafe(48))
+secret_key = SECRET_PATH.read_text(encoding="utf-8").strip()
+if len(secret_key) < 32:
+    raise RuntimeError("持久 SECRET_KEY 无效，请删除 secret_key 后重新加载")
+
+os.environ.setdefault("APP_ENV", "production")
+os.environ.setdefault("PUBLIC_DEPLOYMENT", "1")
+os.environ.setdefault("SECRET_KEY", secret_key)
+os.environ.setdefault(
+    "DATABASE_URL", f"sqlite:///{DATA_ROOT / 'doc_collab.db'}"
+)
+os.environ.setdefault("UPLOAD_FOLDER", str(DATA_ROOT / "media"))
+os.environ.setdefault("BACKUP_FOLDER", str(DATA_ROOT / "backups"))
+os.environ.setdefault("SESSION_COOKIE_SECURE", "1")
+os.environ.setdefault("WECHAT_MOCK_ENABLED", "0")
+os.environ.setdefault("SHOW_DEMO_CREDENTIALS", "0")
+os.environ.setdefault("TRUST_PROXY_HEADERS", "1")
+os.environ.setdefault("LOG_LEVEL", "INFO")
+
+if str(BACKEND_DIR) not in sys.path:
+    sys.path.insert(0, str(BACKEND_DIR))
 
 from app import create_app  # noqa: E402
 
-# PythonAnywhere 认 application 这个变量名
+
 application = create_app()

@@ -1,124 +1,178 @@
-# 部署到 PythonAnywhere（免费、免信用卡）
+# 部署到 PythonAnywhere：免信用卡、持久磁盘
 
-PythonAnywhere 免费版不需要信用卡，能跑这个 Flask 后端，而且磁盘是持久的——重新加载
-网站不会清空数据库和上传的文件，这是它相比 Render 免费版的优势。适合给老师、外部测试
-同学验收演示。
+## 1. 适用场景
 
-免费版的代价（下面「免费版能做/不能做」有完整清单）：只能用它给的
-`<你的用户名>.pythonanywhere.com` 域名、不能绑自己的域名、外网访问受限（**真实微信登录
-和 AI 问答/自动预审都用不了**）。
+PythonAnywhere Beginner（Free）不要信用卡，账号磁盘在 Reload、重启和重新部署之间
+持续保留。适合没有 Render 可接受银行卡、以工号密码登录的小规模教研团队。
 
-## 一、注册
+限制必须提前明确：
 
-1. 打开 <https://www.pythonanywhere.com>，点 Pricing → 选 **Beginner（Free）** → Create account。
-2. 只填用户名、邮箱、密码，**不需要信用卡、不需要手机号**。
-3. 用户名会变成你的网址：`https://<用户名>.pythonanywhere.com`。
+- 只能使用 `<用户名>.pythonanywhere.com`，不能绑定自己的域名；
+- 免费账号每天约 100 CPU 秒，适合小团队低频使用；
+- 账号磁盘约 512 MB，需要控制附件和备份数量；
+- 免费账号外网访问受限，真实微信登录和模型 API 通常不可用；
+- AI 不可用时文档、表格、问答、权限流程和人工兜底仍然可用。
 
-## 二、把代码拉下来
+## 2. 注册与拉取代码
 
-Dashboard → New console → **Bash**，然后：
+1. 打开 <https://www.pythonanywhere.com>，选择 Beginner（Free）创建账号。
+2. Dashboard → **New console → Bash**。
+3. 拉取已经包含公网加固的 `main`：
 
 ```bash
-git clone https://github.com/zhouqq-hash/-Document-collaboration-platform.git ~/doc-collab
+git clone https://github.com/zhouqq-hash/-Document-collaboration-platform.git \
+  ~/doc-collab
 ```
 
-（GitHub 在免费账号的外网白名单里，`git clone` 可以正常用。）
+## 3. 创建环境和持久数据目录
 
-## 三、建虚拟环境、装依赖
-
-先看看有哪些 Python 版本：
+选择 Python 3.11 或更高版本：
 
 ```bash
 ls /usr/bin/python3*
+mkvirtualenv --python=/usr/bin/python3.11 doc-collab-env
+pip install -r ~/doc-collab/backend/requirements.txt
+mkdir -p ~/doc-collab-data/media ~/doc-collab-data/backups
 ```
 
-然后建环境、装依赖（把 `3.11` 换成上一步存在且 ≥ 3.11 的版本）：
+如果 `mkvirtualenv` 不存在，可用：
 
 ```bash
-mkvirtualenv --python=/usr/bin/python3.11 doc-collab-env
+python3.11 -m venv ~/doc-collab-env
+source ~/doc-collab-env/bin/activate
 pip install -r ~/doc-collab/backend/requirements.txt
 ```
 
-> 如果 `mkvirtualenv` 不存在，用 `python3.11 -m venv ~/doc-collab-env` 代替，后面虚拟环境
-> 路径填 `/home/<你的用户名>/doc-collab-env`。
+## 4. 设置生产环境
 
-## 四、初始化数据库
+每次新开 Bash 执行部署命令时都先设置：
+
+```bash
+test -f ~/doc-collab-data/secret_key || \
+  python3 -c "from pathlib import Path; import secrets; Path.home().joinpath('doc-collab-data/secret_key').write_text(secrets.token_urlsafe(48))"
+chmod 600 ~/doc-collab-data/secret_key
+export SECRET_KEY="$(cat ~/doc-collab-data/secret_key)"
+export APP_ENV=production
+export PUBLIC_DEPLOYMENT=1
+export DATABASE_URL="sqlite:////home/$USER/doc-collab-data/doc_collab.db"
+export UPLOAD_FOLDER="/home/$USER/doc-collab-data/media"
+export BACKUP_FOLDER="/home/$USER/doc-collab-data/backups"
+export SESSION_COOKIE_SECURE=1
+export WECHAT_MOCK_ENABLED=0
+export SHOW_DEMO_CREDENTIALS=0
+export TRUST_PROXY_HEADERS=1
+```
+
+`SECRET_KEY` 不需要手工保存到仓库：WSGI 模板会在第一次运行时生成
+`~/doc-collab-data/secret_key`，权限为 600，并在以后保持不变。
+
+## 5. 初始化数据库和管理员
 
 ```bash
 cd ~/doc-collab
 flask --app backend/run.py db upgrade
-flask --app backend/run.py seed
+flask --app backend/run.py bootstrap-admin --username admin
+flask --app backend/run.py create-user --username teacher01 --name "张老师"
+flask --app backend/run.py doctor --strict
 ```
 
-`seed` 是幂等的，重复执行不会造重复数据。
+密码会隐藏输入并要求二次确认。不要执行 `seed`、`demo-reset`，也不要创建
+`admin123` / `teacher123` 这类演示弱口令。
 
-## 五、配置 Web 应用
+`doctor --strict` 必须没有阻塞项；AI 未配置只会显示提醒，不影响核心业务。
 
-1. 顶部切到 **Web** 标签 → **Add a new web app**。
-2. 域名用默认的 `<用户名>.pythonanywhere.com` → 下一步选 **Manual configuration**（不要选
-   Flask 向导，我们用自己的项目结构）→ 选和第三步一致的 Python 版本。
-3. 回到 Web 页面，填三处：
+## 6. 配置 Web 应用
 
-   | 字段 | 值 |
-   | --- | --- |
-   | Source code | `/home/<用户名>/doc-collab` |
-   | Working directory | `/home/<用户名>/doc-collab` |
-   | Virtualenv | `/home/<用户名>/.virtualenvs/doc-collab-env` |
+1. Web → **Add a new web app**。
+2. 使用默认域名 → **Manual configuration** → 选择与虚拟环境一致的 Python 版本。
+3. Source code / Working directory 填 `/home/<用户名>/doc-collab`。
+4. Virtualenv 填 `/home/<用户名>/.virtualenvs/doc-collab-env`
+   （如果手动创建则是 `/home/<用户名>/doc-collab-env`）。
+5. 打开 WSGI configuration file，清空后粘贴
+   [deploy/pythonanywhere_wsgi.py](../deploy/pythonanywhere_wsgi.py) 的全部内容。
+6. 如果仓库或数据目录不在默认位置，修改模板顶部的
+   `DOC_COLLAB_PROJECT_ROOT` / `DOC_COLLAB_DATA_ROOT` 默认值。
+7. 保存并点 **Reload**。
 
-4. 点 **WSGI configuration file** 那个链接（形如 `/var/www/<用户名>_pythonanywhere_com_wsgi.py`），
-   把里面内容全部删掉，换成仓库里 [deploy/pythonanywhere_wsgi.py](../deploy/pythonanywhere_wsgi.py)
-   的内容，并改两处：`PROJECT_ROOT` 填你的仓库路径，`SECRET_KEY` 填一串随机字符。
-5. 回到 Web 页面点 **Reload**。
+模板会自动启用：
 
-## 六、验证
+```text
+生产环境 / 公网模式
+持久 SQLite + 持久附件 + 持久备份
+Secure / HttpOnly / SameSite=Lax Cookie
+关闭模拟微信登录和演示凭据
+稳定且持久化的随机 SECRET_KEY
+```
 
-1. 打开 `https://<用户名>.pythonanywhere.com/api/health`，返回 `{"status":"ok"}`。
-2. 打开 `https://<用户名>.pythonanywhere.com/` 进登录页，用演示账号登录或点「模拟微信扫码登录」：
+## 7. 验证
 
-   ```text
-   admin / admin123       管理员
-   teacher / teacher123   文档负责人
-   viewer / viewer123     普通教师
-   ```
+```text
+https://<用户名>.pythonanywhere.com/api/health
+https://<用户名>.pythonanywhere.com/api/ready
+https://<用户名>.pythonanywhere.com/
+```
 
-3. 走一遍建分类、上传文档、发起问答，确认都能用。
+登录页应当为空，不显示演示账号。随后完成一次：
 
-## 七、以后更新代码
+1. 管理员登录；
+2. 新建分类和文档并上传附件；
+3. 普通教师访问与越权操作；
+4. Web → Reload 后重新登录，确认数据仍在；
+5. 没有模型时上传文档，确认可走人工兜底。
+
+也可在本机使用 [public_acceptance.py](../tools/public_acceptance.py) 做两阶段验收：
+
+```powershell
+$env:ACCEPTANCE_ADMIN_USER = "admin"
+$env:ACCEPTANCE_TEACHER_USER = "teacher01"
+
+.\.venv\Scripts\python.exe tools/public_acceptance.py `
+  --base-url https://你的用户名.pythonanywhere.com --phase create
+
+# PythonAnywhere Web 页面点 Reload 后
+.\.venv\Scripts\python.exe tools/public_acceptance.py `
+  --base-url https://你的用户名.pythonanywhere.com --phase verify --cleanup
+```
+
+## 8. 备份与恢复
+
+```bash
+cd ~/doc-collab
+flask --app backend/run.py backup
+flask --app backend/run.py restore \
+  /home/$USER/doc-collab-data/backups/备份文件.zip --yes
+```
+
+由于免费磁盘只有约 512 MB，建议保留最新 1 至 2 份备份，并定期把备份下载到本机。
+执行 restore 后，在 Web 页面立即点 Reload。
+
+## 9. 更新代码
 
 ```bash
 cd ~/doc-collab
 git pull
-flask --app backend/run.py db upgrade   # 只有这次更新带了新迁移时才需要
+test -f ~/doc-collab-data/secret_key || \
+  python3 -c "from pathlib import Path; import secrets; Path.home().joinpath('doc-collab-data/secret_key').write_text(secrets.token_urlsafe(48))"
+export SECRET_KEY="$(cat ~/doc-collab-data/secret_key)"
+export APP_ENV=production
+export PUBLIC_DEPLOYMENT=1
+export DATABASE_URL="sqlite:////home/$USER/doc-collab-data/doc_collab.db"
+export UPLOAD_FOLDER="/home/$USER/doc-collab-data/media"
+export BACKUP_FOLDER="/home/$USER/doc-collab-data/backups"
+export SESSION_COOKIE_SECURE=1
+export WECHAT_MOCK_ENABLED=0
+export SHOW_DEMO_CREDENTIALS=0
+flask --app backend/run.py db upgrade
+flask --app backend/run.py doctor --strict
 ```
 
-然后在 Web 标签点一次 **Reload**。
+最后在 Web 页面点 **Reload**。数据目录与代码目录分离，拉取新代码不会覆盖业务数据。
 
-## 八、免费版能做 / 不能做
+## 10. 常见问题
 
-| 功能 | 免费版 | 说明 |
-| --- | --- | --- |
-| 登录（工号密码） | ✅ | |
-| 微信登录（演示模式） | ✅ | 页面的「模拟微信扫码登录」 |
-| 微信登录（真实扫码） | ❌ | 需要外网调微信接口 + 已备案域名，免费版都做不到 |
-| 分类 / 文档 / 版本 / 下载 | ✅ | 上传的文件存在账号磁盘里，重新加载不丢 |
-| 问答讨论 / 时间线 / 意见汇总 | ✅ | |
-| AI 问答 / 自动预审 | ❌ | 需要外网调模型接口，免费版外网受限 |
-| 绑自己的域名 | ❌ | 免费版只能用 `<用户名>.pythonanywhere.com` |
-| 每天 CPU 限额 | ⚠️ | 免费账号每天 100 CPU 秒，日常演示够用，别跑批量任务 |
-| 磁盘 | ⚠️ | 免费账号 512 MB，装完依赖后剩的不多，别堆大文件 |
-
-## 九、常见问题
-
-- **打开是 502 / 报错页**：Web 标签下方有 error log，先看它。
-- **ModuleNotFoundError: No module named 'app'**：WSGI 文件里的 `BACKEND_DIR` 路径不对，
-  确认 `PROJECT_ROOT` 指向真正的仓库目录。
-- **改了代码但页面没变**：Web 标签点 Reload；PythonAnywhere 不会像 Render 那样自动重启。
-- **上传后下载报 500**：确认 `~/doc-collab/backend/media/` 存在且可写，重新跑一次
-  `flask --app backend/run.py seed` 可以补回示例文件。
-- **代码从哪来**：PythonAnywhere 是从 GitHub 拉代码的，**本地没提交的改动它拉不到**，先提交
-  并推送。
-
-## 十、和 Render 方案的关系
-
-仓库里同时保留了 Render 的配置（`render.yaml`、`scripts/render-start.sh`）。哪天有了一张
-双币信用卡、想要自定义域名或需要外网能力，可以直接切过去，不需要返工。
+- 页面 502：Web 页面下方查看 error log，先确认虚拟环境和 `PROJECT_ROOT`。
+- `ModuleNotFoundError: app`：检查 `~/doc-collab/backend` 是否存在。
+- Cookie 登录后立即失效：确认站点是 HTTPS，且 `SESSION_COOKIE_SECURE=1`。
+- AI 请求失败：免费账号外网受限属于预期情况，使用预审记录中的人工兜底。
+- 预审一直执行中：在 Bash 执行 `flask --app backend/run.py recover-reviews`。
+- 磁盘不足：下载并清理旧备份，或减少大附件。
