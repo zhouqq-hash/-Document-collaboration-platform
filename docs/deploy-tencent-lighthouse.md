@@ -64,6 +64,14 @@ bash scripts/tencent-lighthouse-bootstrap.sh
 然后自动生成 `.env` 和随机 `SECRET_KEY`、构建镜像、启动应用、等待 `/api/ready`、
 初始化管理员并运行 `doctor --strict`。最后会检查 HTTPS。
 
+构建前还会检查域名 A 记录与腾讯云公网 IP、根分区至少 5 GB 可用空间，以及服务器能否
+访问 Let's Encrypt。如果域名前面另接了 CDN/代理，解析 IP 与源站不同，可在确认代理已
+正确转发 HTTP-01 验证后执行：
+
+```bash
+ALLOW_DOMAIN_MISMATCH=1 bash scripts/tencent-lighthouse-bootstrap.sh
+```
+
 部署地址：
 
 ```text

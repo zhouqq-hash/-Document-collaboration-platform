@@ -61,6 +61,47 @@ if [ "$SECRET_KEY" = "replace-with-at-least-32-random-characters" ] \
   echo ".env 仍是示例值，请填入真实域名和邮箱并重新生成 SECRET_KEY。" >&2
   exit 1
 fi
+case "$ACME_EMAIL" in
+  *@*.*) ;;
+  *)
+    echo "ACME_EMAIL 格式不正确：$ACME_EMAIL" >&2
+    exit 1
+    ;;
+esac
+
+resolved_ip="$(
+  getent ahostsv4 "$APP_DOMAIN" 2>/dev/null \
+    | awk 'NR == 1 { print $1 }'
+)"
+if [ -z "$resolved_ip" ]; then
+  echo "域名 $APP_DOMAIN 没有解析到 IPv4 A 记录。" >&2
+  exit 1
+fi
+
+public_ip="$(
+  curl --fail --silent --show-error --max-time 5 \
+    http://metadata.tencentyun.com/latest/meta-data/public-ipv4 \
+    2>/dev/null || true
+)"
+if [ -n "$public_ip" ] && [ "$resolved_ip" != "$public_ip" ]; then
+  echo "域名解析为 $resolved_ip，但服务器公网 IP 是 $public_ip。" >&2
+  if [ "${ALLOW_DOMAIN_MISMATCH:-0}" != "1" ]; then
+    echo "请修正 DNS A 记录；如确实使用 CDN/代理，设置 ALLOW_DOMAIN_MISMATCH=1 后重试。" >&2
+    exit 1
+  fi
+fi
+
+available_kb="$(df -Pk "$ROOT_DIR" | awk 'NR == 2 { print $4 }')"
+if [ -n "$available_kb" ] && [ "$available_kb" -lt 5242880 ]; then
+  echo "根分区剩余空间不足 5 GB，无法安全构建镜像和保存备份。" >&2
+  exit 1
+fi
+
+if ! curl --fail --silent --show-error --max-time 15 \
+  https://acme-v02.api.letsencrypt.org/directory >/dev/null; then
+  echo "服务器无法访问 Let's Encrypt，无法自动签发 HTTPS 证书。" >&2
+  exit 1
+fi
 
 docker compose config --quiet
 docker compose up -d --build
