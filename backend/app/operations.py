@@ -169,6 +169,31 @@ def create_backup(app, output=None, overwrite=False):
     }
 
 
+def prune_backups(folder, keep):
+    """Keep only the newest automatic ``doc-collab-*.zip`` backups."""
+    if keep < 1:
+        raise ValueError("备份保留数量至少为 1")
+    backup_folder = Path(folder).expanduser().resolve()
+    if not backup_folder.exists():
+        return 0
+    candidates = sorted(
+        (
+            path
+            for path in backup_folder.iterdir()
+            if path.is_file()
+            and path.suffix.lower() == ".zip"
+            and path.name.startswith("doc-collab-")
+        ),
+        key=lambda path: (path.stat().st_mtime_ns, path.name),
+        reverse=True,
+    )
+    removed = 0
+    for path in candidates[keep:]:
+        path.unlink()
+        removed += 1
+    return removed
+
+
 def inspect_backup(path):
     archive_path = Path(path).expanduser().resolve()
     if not archive_path.exists():
@@ -435,6 +460,34 @@ def run_doctor(app):
     except Exception as exc:
         checks.append(
             _check_result("error", "备份目录", f"不可写：{exc}")
+        )
+
+    try:
+        usage = shutil.disk_usage(Path(app.config["UPLOAD_FOLDER"]))
+        free_mb = usage.free // (1024 * 1024)
+        if free_mb < 50:
+            checks.append(
+                _check_result(
+                    "error",
+                    "磁盘空间",
+                    f"仅剩 {free_mb} MB，请先清理旧备份或附件",
+                )
+            )
+        elif public and free_mb < 100:
+            checks.append(
+                _check_result(
+                    "warning",
+                    "磁盘空间",
+                    f"仅剩 {free_mb} MB，建议保留不超过 2 份备份",
+                )
+            )
+        else:
+            checks.append(
+                _check_result("ok", "磁盘空间", f"剩余 {free_mb} MB")
+            )
+    except OSError as exc:
+        checks.append(
+            _check_result("warning", "磁盘空间", f"无法读取：{exc}")
         )
 
     db.session.remove()

@@ -100,7 +100,7 @@ $env:ACCEPTANCE_TEACHER_USER = "teacher01"
 在 Render Shell 执行：
 
 ```bash
-python -m flask --app backend/run.py backup
+python -m flask --app backend/run.py backup --keep 14
 python -m flask --app backend/run.py backup --output /var/data/backups/manual.zip
 ```
 

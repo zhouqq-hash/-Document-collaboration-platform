@@ -24,6 +24,21 @@ git clone https://github.com/zhouqq-hash/-Document-collaboration-platform.git \
   ~/doc-collab
 ```
 
+如果提示 `destination path ... already exists`，不要重复克隆，也不要直接删除旧目录：
+
+```bash
+cd ~/doc-collab
+git status --short --branch
+git remote -v
+git pull --ff-only
+```
+
+- `git status` 显示工作区干净、远端是目标 GitHub 仓库时，直接 `git pull --ff-only`。
+- 远端不是目标仓库时：`git remote set-url origin https://github.com/zhouqq-hash/-Document-collaboration-platform.git`，
+  再执行 `git pull --ff-only`。
+- 如果目录不是 Git 仓库，或本地改动无法合并，先改名保留：
+  `mv ~/doc-collab ~/doc-collab-old-$(date +%Y%m%d%H%M)`，然后重新执行 clone。
+
 ## 3. 创建环境和持久数据目录
 
 选择 Python 3.11 或更高版本：
@@ -138,7 +153,7 @@ $env:ACCEPTANCE_TEACHER_USER = "teacher01"
 
 ```bash
 cd ~/doc-collab
-flask --app backend/run.py backup
+flask --app backend/run.py backup --keep 2
 flask --app backend/run.py restore \
   /home/$USER/doc-collab-data/backups/备份文件.zip --yes
 ```
@@ -171,6 +186,8 @@ flask --app backend/run.py doctor --strict
 ## 10. 常见问题
 
 - 页面 502：Web 页面下方查看 error log，先确认虚拟环境和 `PROJECT_ROOT`。
+- 克隆提示目录已存在：进入旧目录检查 `git status` / `git remote -v`，通过 `git pull --ff-only`
+  更新；不要直接覆盖或删除旧目录。
 - `ModuleNotFoundError: app`：检查 `~/doc-collab/backend` 是否存在。
 - Cookie 登录后立即失效：确认站点是 HTTPS，且 `SESSION_COOKIE_SECURE=1`。
 - AI 请求失败：免费账号外网受限属于预期情况，使用预审记录中的人工兜底。

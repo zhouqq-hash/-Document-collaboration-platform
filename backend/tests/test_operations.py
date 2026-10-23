@@ -1,9 +1,11 @@
+import os
+import tempfile
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from app import ai_review, create_app, db
 from app.models import Document, DocumentAiReview, DocumentVersion, User
-from app.operations import run_doctor
+from app.operations import prune_backups, run_doctor
 from conftest import create_document, login
 
 
@@ -130,6 +132,32 @@ def test_backup_and_restore_recover_database_and_uploaded_file(app, client):
         )
         assert version is not None
     assert app.extensions["storage"].read(uploaded_key) == b"first version"
+
+
+def test_backup_retention_only_removes_old_automatic_archives():
+    temp_root = Path(__file__).resolve().parents[1] / ".pytest_tmp"
+    temp_root.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(dir=temp_root) as temp:
+        backup_folder = Path(temp) / "backups"
+        backup_folder.mkdir()
+        automatic = [
+            backup_folder / f"doc-collab-{index}.zip"
+            for index in range(1, 4)
+        ]
+        manual = backup_folder / "manual-keep.zip"
+        pre_restore = backup_folder / "pre-restore-keep.zip"
+        for index, path in enumerate(automatic + [manual, pre_restore]):
+            path.write_bytes(b"zip")
+            os.utime(path, ns=(index + 1, index + 1))
+
+        removed = prune_backups(backup_folder, keep=2)
+
+        assert removed == 1
+        assert not automatic[0].exists()
+        assert automatic[1].exists()
+        assert automatic[2].exists()
+        assert manual.exists()
+        assert pre_restore.exists()
 
 
 def test_recover_reviews_turns_stale_work_into_manual_fallback(app, client):

@@ -630,9 +630,14 @@ def register_commands(app):
     @app.cli.command("backup")
     @click.option("--output", type=click.Path(dir_okay=False, path_type=Path))
     @click.option("--force", is_flag=True, help="覆盖已存在的输出文件。")
-    def backup(output, force):
+    @click.option(
+        "--keep",
+        type=click.IntRange(min=1),
+        help="只保留最近 N 份自动命名的备份。",
+    )
+    def backup(output, force, keep):
         """备份数据库和本地文件，并写入可校验的 manifest。"""
-        from .operations import create_backup
+        from .operations import create_backup, prune_backups
 
         result = create_backup(app, output=output, overwrite=force)
         print(f"备份完成：{result['path']}")
@@ -641,6 +646,9 @@ def register_commands(app):
             print(f"本地文件：{result['media'].get('file_count', 0)} 个")
         if result["media"].get("warning"):
             print(f"[提醒] {result['media']['warning']}")
+        if keep is not None:
+            removed = prune_backups(app.config["BACKUP_FOLDER"], keep)
+            print(f"已清理旧自动备份：{removed} 份（保留 {keep} 份）。")
 
     @app.cli.command("restore")
     @click.argument("path", type=click.Path(exists=True, dir_okay=False, path_type=Path))
