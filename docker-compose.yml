@@ -8,9 +8,9 @@ services:
       APP_ENV: production
       PUBLIC_DEPLOYMENT: "1"
       SECRET_KEY: "${SECRET_KEY:?Set SECRET_KEY in .env}"
-      DATABASE_URL: sqlite:////data/doc_collab.db
-      UPLOAD_FOLDER: /data/media
-      BACKUP_FOLDER: /data/backups
+      DATABASE_URL: sqlite:////data/app/doc_collab.db
+      UPLOAD_FOLDER: /data/app/media
+      BACKUP_FOLDER: /data/app/backups
       SESSION_COOKIE_SECURE: "1"
       WECHAT_MOCK_ENABLED: "0"
       SHOW_DEMO_CREDENTIALS: "0"

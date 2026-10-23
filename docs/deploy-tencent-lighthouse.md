@@ -146,8 +146,8 @@ docker compose exec app python -m flask --app backend/run.py \
 复制备份到服务器当前目录：
 
 ```bash
-docker compose exec app sh -c 'ls -lh /data/backups'
-docker compose cp app:/data/backups/备份文件名.zip ./
+docker compose exec app sh -c 'ls -lh /data/app/backups'
+docker compose cp app:/data/app/backups/备份文件名.zip ./
 ```
 
 恢复时先停止应用，再运行一次性容器；恢复命令会自动生成恢复前快照：
@@ -155,7 +155,7 @@ docker compose cp app:/data/backups/备份文件名.zip ./
 ```bash
 docker compose stop caddy app
 docker compose run --rm app python -m flask --app backend/run.py \
-  restore /data/backups/备份文件名.zip --yes
+  restore /data/app/backups/备份文件名.zip --yes
 docker compose up -d
 ```
 

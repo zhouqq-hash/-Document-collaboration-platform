@@ -9,7 +9,7 @@ WORKDIR /app
 
 RUN groupadd --gid 10001 doccollab \
     && useradd --uid 10001 --gid doccollab --create-home doccollab \
-    && mkdir -p /data/media /data/backups \
+    && mkdir -p /data/app/media /data/app/backups \
     && chown -R doccollab:doccollab /data
 
 COPY backend/requirements-render.txt /app/backend/requirements-render.txt
