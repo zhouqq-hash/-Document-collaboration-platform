@@ -6,6 +6,22 @@ DATA_ROOT="${DOC_COLLAB_DATA_ROOT:-$HOME/doc-collab-data}"
 PYTHON_BIN="${PYTHON_BIN:-python}"
 ADMIN_USERNAME="${BOOTSTRAP_ADMIN_USERNAME:-admin}"
 
+if ! "$PYTHON_BIN" -c '
+import os
+import subprocess
+import sys
+if sys.version_info < (3, 11):
+    raise SystemExit("需要 Python 3.11 或更高版本")
+if os.name == "posix":
+    import _posixsubprocess
+' >/dev/null 2>&1; then
+  echo "当前 Python 环境不可用（版本过低、缺少 subprocess 或 _posixsubprocess）。" >&2
+  echo "虚拟环境可能已损坏；~/doc-collab-data 中的业务数据不会被修改。" >&2
+  echo "先运行：bash scripts/pythonanywhere-environment-check.sh" >&2
+  echo "然后按 docs/deploy-pythonanywhere.md 的常见问题重建虚拟环境。" >&2
+  exit 2
+fi
+
 if [ ! -d "$PROJECT_ROOT/.git" ]; then
   echo "找不到 Git 仓库：$PROJECT_ROOT" >&2
   echo "请先按 docs/deploy-pythonanywhere.md 克隆或更新代码。" >&2

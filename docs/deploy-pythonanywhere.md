@@ -200,7 +200,7 @@ flask --app backend/run.py doctor --strict
 
   ```bash
   deactivate 2>/dev/null || true
-  python3.11 -c "import subprocess, _posixsubprocess; print('python-ok')"
+  bash ~/doc-collab/scripts/pythonanywhere-environment-check.sh
   mv ~/.virtualenvs/doc-collab-env \
     ~/.virtualenvs/doc-collab-env-broken-$(date +%Y%m%d%H%M)
   mkvirtualenv --python=/usr/bin/python3.11 doc-collab-env
@@ -208,9 +208,9 @@ flask --app backend/run.py doctor --strict
   python -m pip install -r ~/doc-collab/backend/requirements.txt
   ```
 
-  如果系统级诊断命令 `python3.11 -c ...` 也失败，说明该 Python 版本本身不完整，不要再
-  复制旧环境。执行 `ls /usr/bin/python3*`，选择另一个 PythonAnywhere 提供的版本重建，
-  并在 Web 页面同步修改虚拟环境路径。旧环境只改名，不直接删除。
+  检查脚本会列出每个版本“可用 / 损坏 / 版本低”。如果 Python 3.11 也标记为损坏，
+  说明该 Python 版本本身不完整，不要再复制旧环境；选择脚本标记为可用的版本重建，
+  并把上方 `--python` 路径换成对应版本。旧环境只改名，不直接删除。
 - 克隆提示目录已存在：进入旧目录检查 `git status` / `git remote -v`，通过 `git pull --ff-only`
   更新；不要直接覆盖或删除旧目录。
 - `ModuleNotFoundError: app`：检查 `~/doc-collab/backend` 是否存在。
