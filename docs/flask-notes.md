@@ -1,7 +1,6 @@
 # Flask 文档管理模块笔记
 
 这份笔记只整理本项目 `backend/` 里的 Flask 文档管理模块，用于复习、答辩和交付讲解。
-Django 的对照内容单独放在 `docs/django-vs-flask.md` 和 `docs/django-notes.md`，不要混在一起。
 
 一句话结论：这是一个「Flask JSON API + 顺带托管静态原型」的单体后端，用 4 张表把登录（工号密码 + 微信扫码）、分类、文档、版本串成一条完整链路，21 个业务接口，48 个 pytest 用例全绿。
 
@@ -233,7 +232,6 @@ next_number = max((v.version_number for v in document.versions), default=0) + 1
 | 启动后查询报 `no such column: document_categories.created_at` | 模型加了字段但没生成迁移；补迁移 + `flask db upgrade` 解决。SQLAlchemy 不会自动改表结构 |
 | 浏览器打开页面 404 Not Found | 5000 端口被另一个 `doc-platform` 服务占用，不是本项目后端；用 `/api/health` 是否返回 `{"status":"ok"}` 判断 |
 | 原型页面不能双击打开 | `file://` 方式无法带 Cookie 调 Flask API，必须先启动后端再从 `/` 进入 |
-| 两个虚拟环境互相干扰 | `.venv` 跑 Flask 项目，`.django-learning` 只跑 Django 教程；一个终端只激活一个，装包统一用 `python -m pip` |
 | 上传后重新 seed 找不到文件 | `instance/` 和 `media/` 不进版本库，换机器要重新执行 `db upgrade` + `seed` |
 | 运行 `.ps1` 脚本报「字符串缺少终止符」 | Windows PowerShell 5.1 按 ANSI/GBK 解析**无 BOM 的 UTF-8** 脚本，中文的多字节序列会吃掉结尾引号。`tools/wechat-tunnel.ps1` 因此保持纯 ASCII；自己要写含中文的脚本，用 `pwsh` 或另存为 UTF-8 with BOM |
 
@@ -253,7 +251,7 @@ next_number = max((v.version_number for v in document.versions), default=0) + 1
 ## 10. 自测问答
 
 **为什么这个项目选 Flask 而不是 Django？**
-模块只提供 JSON API，业务边界清晰，不需要 Admin 和完整的 ORM 约定；Flask 的路由和蓝图更轻，代码量小、依赖少，适合先跑通业务。Django 作为对照学习，不重复实现。
+模块只提供 JSON API，业务边界清晰，不需要 Django Admin 和完整的 ORM 约定；Flask 的路由和蓝图更轻，代码量小、依赖少，适合先跑通业务。
 
 **版本号唯一性靠什么保证？**
 应用层 `max(已有版本号) + 1` 算出下一个号，数据库层再加 `(document_id, version_number)` 唯一约束兜底。前者保证正常流程连续，后者防止异常写入。

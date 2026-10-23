@@ -102,4 +102,3 @@ python backend\run.py
 
 - `backend/instance/`、`backend/media/`、`testdata/` 里的东西都是本机运行产生的，**不会**进版本库，也可以随便删。
 - 测完想恢复干净状态，执行一次 `python -m flask --app backend\run.py demo-reset` 就行。
-- `djangotutorial/` 是 Django 官方教程的练习项目，属于学习资料，不是本系统的一部分，测试时不用管它。
