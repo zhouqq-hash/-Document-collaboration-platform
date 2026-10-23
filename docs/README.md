@@ -49,6 +49,7 @@
 | `deploy-render.md`         | Render 公网部署：持久盘、生产环境变量、管理员初始化、验证、备份与恢复            |
 | `deploy-pythonanywhere.md` | PythonAnywhere 免信用卡持久部署：生产环境、管理员、备份恢复、验证与限制 |
 | `production-runbook.md`    | 公网启动、权限边界、AI 降级、排障追踪、备份恢复与上线验收清单                   |
+| `deploy-tencent-lighthouse.md` | 腾讯云轻量服务器 Docker 部署：Caddy HTTPS、持久卷、备份、恢复与公网重启验收 |
 | `../backend/README.md`     | 后端交付说明：运行环境、启动、演示账号、接口表、微信登录配置、学习重点                  |
 
 ## 6. 工作日志

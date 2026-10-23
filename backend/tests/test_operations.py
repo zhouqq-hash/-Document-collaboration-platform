@@ -6,7 +6,7 @@ from pathlib import Path
 from app import ai_review, create_app, db
 from app.models import Document, DocumentAiReview, DocumentVersion, User
 from app.operations import prune_backups, run_doctor
-from conftest import create_document, login
+from conftest import build_test_config, create_document, login
 
 
 def test_readiness_reports_database_and_storage(client):
@@ -18,6 +18,22 @@ def test_readiness_reports_database_and_storage(client):
     assert payload["checks"]["database"]["status"] == "ok"
     assert payload["checks"]["storage"]["status"] == "ok"
     assert response.headers["X-Request-ID"]
+
+
+def test_create_app_only_creates_configured_sqlite_parent():
+    temp_root = Path(__file__).resolve().parents[1] / ".pytest_tmp"
+    temp_root.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(dir=temp_root) as temp:
+        root = Path(temp)
+        nested_database = root / "persistent" / "nested" / "app.db"
+        config = build_test_config(
+            root,
+            SQLALCHEMY_DATABASE_URI=f"sqlite:///{nested_database}",
+        )
+
+        create_app(config)
+
+        assert nested_database.parent.is_dir()
 
 
 def test_sqlite_uses_integrity_and_concurrency_pragmas(app):

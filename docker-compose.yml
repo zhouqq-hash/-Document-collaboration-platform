@@ -1,0 +1,73 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      APP_ENV: production
+      PUBLIC_DEPLOYMENT: "1"
+      SECRET_KEY: "${SECRET_KEY:?Set SECRET_KEY in .env}"
+      DATABASE_URL: sqlite:////data/doc_collab.db
+      UPLOAD_FOLDER: /data/media
+      BACKUP_FOLDER: /data/backups
+      SESSION_COOKIE_SECURE: "1"
+      WECHAT_MOCK_ENABLED: "0"
+      SHOW_DEMO_CREDENTIALS: "0"
+      TRUST_PROXY_HEADERS: "1"
+      LOG_LEVEL: INFO
+      COSMOS_API_KEY: "${COSMOS_API_KEY:-}"
+      COSMOS_API_BASE: "${COSMOS_API_BASE:-https://api.siliconflow.cn/v1}"
+      COSMOS_MODEL: "${COSMOS_MODEL:-deepseek-ai/DeepSeek-V4-Flash}"
+      WECHAT_APP_ID: "${WECHAT_APP_ID:-}"
+      WECHAT_APP_SECRET: "${WECHAT_APP_SECRET:-}"
+      WECHAT_REDIRECT_URI: "${WECHAT_REDIRECT_URI:-}"
+      WECHAT_AUTHORIZE_MODE: "${WECHAT_AUTHORIZE_MODE:-open}"
+    volumes:
+      - "app_data:/data"
+    expose:
+      - "8000"
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/ready', timeout=5)",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_healthy
+    environment:
+      APP_DOMAIN: "${APP_DOMAIN:?Set APP_DOMAIN in .env}"
+      ACME_EMAIL: "${ACME_EMAIL:?Set ACME_EMAIL in .env}"
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - "caddy_data:/data"
+      - "caddy_config:/config"
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  app_data:
+  caddy_data:
+  caddy_config:

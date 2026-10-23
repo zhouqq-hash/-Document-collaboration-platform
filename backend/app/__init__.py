@@ -7,7 +7,7 @@ from flask import Flask, g, jsonify, request, send_from_directory
 from flask_login import LoginManager
 from flask_migrate import Migrate
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import event, text
+from sqlalchemy import event, make_url, text
 from sqlalchemy.engine import Engine
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from werkzeug.middleware.proxy_fix import ProxyFix
@@ -71,7 +71,13 @@ def create_app(config=None):
         app.config.from_mapping(config)
     else:
         app.config.from_object(config or Config)
-    Path(BASE_DIR / "instance").mkdir(parents=True, exist_ok=True)
+    database_uri = app.config["SQLALCHEMY_DATABASE_URI"]
+    if database_uri.startswith("sqlite:"):
+        database_path = make_url(database_uri).database
+        if database_path and database_path != ":memory:":
+            Path(database_path).expanduser().parent.mkdir(
+                parents=True, exist_ok=True
+            )
 
     app.logger.setLevel(app.config.get("LOG_LEVEL", "INFO"))
     app.json.ensure_ascii = False

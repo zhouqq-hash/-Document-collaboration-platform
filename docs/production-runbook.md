@@ -5,19 +5,21 @@
 ## 1. 启动与就绪
 
 ```text
-Render 启动
+Docker 容器启动
   -> flask db upgrade
   -> recover-reviews
-  -> bootstrap-admin
-  -> doctor --strict
+  -> doctor（首次部署允许尚无管理员）
   -> gunicorn
   -> /api/ready 通过后接流量
+  -> 首次管理员初始化
+  -> doctor --strict
 ```
 
 - `/api/health` 只表示进程活着，不访问数据库和存储。
 - `/api/ready` 检查核心表可查询、上传目录可读写，失败返回 `503`。
 - `doctor --strict` 会阻止公网环境使用默认密钥、临时 SQLite、默认上传目录、
   模拟微信登录或弱口令。
+- 腾讯云轻量部署的具体命令见 `docs/deploy-tencent-lighthouse.md`。
 
 ## 2. 数据持久化
 

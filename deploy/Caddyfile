@@ -1,0 +1,18 @@
+{
+	email {$ACME_EMAIL}
+	admin off
+}
+
+{$APP_DOMAIN} {
+	encode zstd gzip
+	reverse_proxy app:8000
+
+	header {
+		-Server
+	}
+
+	log {
+		output stdout
+		format console
+	}
+}
