@@ -37,7 +37,7 @@ python -m pip install -r backend\requirements.txt
 # ③ 建数据库（第一次必须执行）
 python -m flask --app backend\run.py db upgrade
 
-# ④ 灌入演示数据（3 篇文档：正常 / 归档 / 废弃 各一篇）
+# ④ 灌入演示数据（5 篇数据库课程审核场景材料）
 python -m flask --app backend\run.py demo-reset --yes
 
 # ⑤ 启动
@@ -63,7 +63,7 @@ python backend\run.py
    .\tools\make-test-files.ps1
    ```
    会在 `testdata\` 下生成正常文件、不支持的格式、超过 50 MB 的超限文件各一个。
-2. 打开 [`docs/testing-guide.md`](docs/testing-guide.md)，按 TC-01 ~ TC-31 逐条走，把结果填在表格里。标「必测」的请务必走完，标「建议测」的尽力。
+2. 打开 [`docs/testing-guide.md`](docs/testing-guide.md)，按 TC-01 ~ TC-35 逐条走，把结果填在表格里。标「必测」的请务必走完，标「建议测」的尽力。
 3. **每跑完一轮先复位再开始下一轮**（上传、新建、改状态都会改数据）：
    ```powershell
    python -m flask --app backend\run.py demo-reset

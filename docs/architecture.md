@@ -74,9 +74,11 @@ media/
 ## 4. 数据模型
 
 - `User`：id、username、name、password_hash（微信用可为空）、role、wechat_openid、wechat_unionid、avatar_url。
-- `DocumentCategory`：id、name、sort_order。
+- `DocumentCategory`：id、name、sort_order、默认规范文档、`review_template_key`。
 - `Document`：id、title、category_id、owner_id。
 - `DocumentVersion`：id、document_id、version_number、filename、file_path、changelog、uploader_id、created_at。
+- `DocumentAiReview`：预审状态、人工结论、上一版退回关联；同时保存模板 key、
+  模板版本和检查清单快照，保证历史审核结果不会因模板升级而改变。
 
 文档的“当前版本”由 `DocumentVersion.version_number` 最大值计算，不额外维护冗余字段。
 

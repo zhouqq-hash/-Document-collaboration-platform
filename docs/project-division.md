@@ -14,13 +14,13 @@
 | --- | --- | --- |
 | 文档管理模块（分类、文档、版本、上传、下载、权限） | ✅ 已完成 | `backend/` + `prototype/documents/`，原型验收 P-01 ~ P-08 通过 |
 | 微信扫码登录 | ✅ 演示模式交付；真机联调暂停 | `docs/wechat-login-guide.md`、`docs/worklog-2026-09-27.md` |
-| 自动化测试 | ✅ 88 个用例通过（含微信 60 个） | `.\.venv\Scripts\python.exe -m pytest backend\tests -q` |
+| 自动化测试 | ✅ 225 个用例通过（含微信 60 个） | `.\.venv\Scripts\python.exe -m pytest backend\tests -q` |
 | 文档模块剩余走查（上传页文件选择、微信建号用工号登录的文案、列表筛选与状态徽标） | ✅ 已补做并修复发现的问题 | `docs/prototype-acceptance.md`「剩余走查补充（2026-09-28）」：登录失败文案、超 50 MB 提示、筛选 URL、文件框类型过滤四条已修并复验；另有 1 步需人工打开一次系统文件框 |
-| 外部测试交底包 | ✅ 已备 | `docs/testing-guide.md`（TC-01 ~ TC-31）+ `flask demo-reset` 复位命令 + `tools\make-test-files.ps1` 测试素材 |
+| 外部测试交底包 | ✅ 已备 | `docs/testing-guide.md`（TC-01 ~ TC-35）+ `flask demo-reset` 复位命令 + 数据库课程 AI 审核场景 |
 | 问答管理模块（话题聚合、意见汇总） | ✅ 已完成（2026-10-12 交付） | `backend/app/qa.py` + `prototype/qa/`，见 `docs/worklog-2026-10-12.md`、`docs/qa-module-requirements.md` |
-| 表格协作模块（行内编辑、修改记录、版本回滚） | ⬜ 未开始 | 招募说明第 2 节 |
+| 表格协作模块（行内编辑、修改记录、版本回滚） | ✅ 已完成 | `backend/app/tables.py` + `prototype/table/` |
 | 用户管理与整体联调 | 🟡 部分完成 | 已有 `/api/users` 和三种角色，缺统一初始化与端到端联调 |
-| 测试、部署上线 | ⬜ 未开始 | 招募说明第 8 节第 15 ~ 16 周 |
+| 测试、部署配置 | 🟡 自动化测试完成；部署配置已备，待真实环境上线验收 | `TESTING.md`、`render.yaml`、`docs/deploy-*.md` |
 
 一句话结论：**文档管理模块和问答管理模块都可以演示，团队的主战场是「表格协作 → 用户管理与联调 → 测试与部署」三段。**
 

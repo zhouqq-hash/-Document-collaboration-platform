@@ -1,6 +1,7 @@
 from pathlib import Path
 
-from app.models import Document, DocumentVersion, User
+from app.extract import extract_text
+from app.models import Document, DocumentAiReview, DocumentVersion, User
 
 
 def test_seed_writes_demo_files_through_storage(app):
@@ -28,43 +29,58 @@ def test_seed_writes_demo_files_through_storage(app):
     assert app.test_cli_runner().invoke(args=["seed"]).exit_code == 0
 
     assert set(storage.saved) == {
-        "sample_program_v1.txt",
-        "sample_syllabus_v1.txt",
-        "sample_report_v1.txt",
+        "scenario_program_plan_v1.docx",
+        "scenario_indicator_map_v1.docx",
+        "scenario_syllabus_spec_v1.docx",
+        "scenario_syllabus_v1.docx",
+        "scenario_assessment_report_v1.docx",
     }
-    assert "考核分析报告" in storage.saved["sample_report_v1.txt"].decode("utf-8")
+    report_text = extract_text(
+        "scenario_assessment_report_v1.docx",
+        storage.saved["scenario_assessment_report_v1.docx"],
+    )
+    assert "数据库原理及应用课程考核分析报告" in report_text
 
     with app.app_context():
         version = DocumentVersion.query.filter_by(
-            file_path="sample_report_v1.txt"
+            file_path="scenario_assessment_report_v1.docx"
         ).first()
         assert version is not None
+        assert DocumentAiReview.query.count() == 0
 
 
-def test_seed_creates_three_statuses_and_is_idempotent(app):
-    """演示数据要覆盖三种文档状态，而且可以反复执行不产生重复。"""
+def test_seed_creates_demo_statuses_and_review_is_idempotent(app):
+    """演示数据覆盖三种状态，首次预审保持未执行，反复执行不产生重复。"""
     runner = app.test_cli_runner()
 
     assert runner.invoke(args=["seed"]).exit_code == 0
 
     with app.app_context():
         documents = Document.query.all()
-        assert len(documents) == 3
+        assert len(documents) == 5
         assert {doc.status for doc in documents} == {
             "active",
             "archived",
             "deprecated",
         }
         assert all(len(doc.versions) == 1 for doc in documents)
+        assert DocumentAiReview.query.count() == 0
+        draft = Document.query.filter(
+            Document.title.contains("待审核")
+        ).one()
+        assert draft.review_state["code"] == "unreviewed"
+        assert len(draft.category.default_spec_document_ids) == 2
+        assert draft.category.review_template_key == "syllabus_v1"
 
     assert runner.invoke(args=["seed"]).exit_code == 0
 
     with app.app_context():
-        assert Document.query.count() == 3
+        assert Document.query.count() == 5
+        assert DocumentAiReview.query.count() == 0
 
 
 def test_demo_reset_restores_initial_state(app):
-    """复位后：文档回到 3 篇、用户回到 3 个演示账号、上传目录只剩示例文件。"""
+    """复位后：演示文档和预审回到初始状态，上传目录只剩示例文件。"""
     runner = app.test_cli_runner()
     assert runner.invoke(args=["seed"]).exit_code == 0
 
@@ -76,16 +92,19 @@ def test_demo_reset_restores_initial_state(app):
 
     assert not uploaded.exists()
     with app.app_context():
-        assert Document.query.count() == 3
+        assert Document.query.count() == 5
+        assert DocumentAiReview.query.count() == 0
         assert {user.username for user in User.query.all()} == {
             "admin",
             "teacher",
             "viewer",
         }
     assert sorted(item.name for item in media_dir.iterdir()) == [
-        "sample_program_v1.txt",
-        "sample_report_v1.txt",
-        "sample_syllabus_v1.txt",
+        "scenario_assessment_report_v1.docx",
+        "scenario_indicator_map_v1.docx",
+        "scenario_program_plan_v1.docx",
+        "scenario_syllabus_spec_v1.docx",
+        "scenario_syllabus_v1.docx",
     ]
 
 
@@ -102,4 +121,5 @@ def test_demo_reset_keep_media(app):
 
     assert uploaded.exists()
     with app.app_context():
-        assert Document.query.count() == 3
+        assert Document.query.count() == 5
+        assert DocumentAiReview.query.count() == 0

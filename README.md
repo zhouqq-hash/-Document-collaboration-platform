@@ -4,18 +4,18 @@
 
 当前仓库已实现三块业务模块，采用 Flask JSON API + 原生 HTML/CSS/JavaScript 前端：
 
-| 模块 | 核心能力 | 主要使用角色 |
-| --- | --- | --- |
-| 文档管理 | 分类浏览、文档卡片、首个版本上传、版本历史、下载与权限控制 | 管理员维护，教师查看和协作 |
+| 模块   | 核心能力                                    | 主要使用角色           |
+| ---- | --------------------------------------- | ---------------- |
+| 文档管理 | 分类浏览、版本历史、下载与权限控制、AI 预审、退回整改和针对性复审     | 管理员维护分类和文档，负责人审核自己负责的文档 |
 | 表格协作 | 空白创建、Excel / CSV 导入、行内编辑、公式重算、修改记录与版本回滚 | 登录用户协作，创建者和管理员管理 |
-| 问答讨论 | 话题筛选、高密度讨论流、关联文档与版本、时间线发言、意见汇总和最终结论 | 登录用户参与，管理员处理治理事项 |
+| 问答讨论 | 话题筛选、高密度讨论流、关联文档与版本、时间线发言、意见汇总和最终结论     | 登录用户参与，管理员处理治理事项 |
 
-当前后端测试结果：**221 passed**。
+当前后端测试结果：**227 passed**。
 
 ## 界面预览
 
-| 文档管理 | 表格协作 | 问答讨论 |
-| --- | --- | --- |
+| 文档管理           | 表格协作           | 问答讨论        |
+| -------------- | -------------- | ----------- |
 | ![文档管理：分类筛选与文档卡片](docs/images/document-management.png) | ![表格协作：新建入口与表格卡片](docs/images/table-collaboration.png) | ![问答讨论：高密度话题流](docs/images/qa-discussion.png) |
 
 ## 目录
@@ -36,6 +36,49 @@
 - 文档以卡片展示分类、状态、负责人、当前版本和更新时间，支持桌面三列、平板两列、手机单列。
 - 创建文档时填写基本信息并上传首个文件，系统自动生成 `v1`。
 - 支持拖放上传、字段级校验、版本历史、版本下载和负责人权限控制。
+- AI 预审形成可追溯闭环：规范对照、问题依据、退回修改、修订版复审、负责人确认；版本历史会标记已通过或已退回的版本。
+- 分类可绑定版本化 AI 审核模板；教学大纲使用 10 项结构化清单，其他分类自动降级到通用质量检查。
+- 人工点击“通过”后先展示二次确认弹窗，提醒核对 AI 结论、待处理事项和最终确认责任。
+- 当前权限边界：管理员负责新建文档和指定负责人；文档负责人可以上传自己文档的新版本、发起预审和处理人工确认。
+
+### AI 审核闭环
+
+当前实现使用版本化审核清单，让模型逐项返回 `pass / fail / unknown` 和原文依据，最终结论由后端根据必检项重新计算，不直接采用模型自报结论。
+
+```text
+分类绑定规范与模板
+  -> 上传或选择版本
+  -> AI 预审
+  -> 人工退回并填写意见
+  -> 上传整改稿
+  -> 自动关联上次问题进行复审
+  -> 人工二次确认通过
+```
+
+仓库内置一套可直接演示的数据库课程审核场景：
+
+- `backend/demo_data/ai_review_scenario/04_数据库原理及应用课程教学大纲_待审核_v1.docx`：首次提交稿，预设学时不一致、考核比例不足和团队目标缺少考核证据。
+- `backend/demo_data/ai_review_scenario/05_数据库原理及应用课程教学大纲_整改稿_v2.docx`：退回后上传的整改稿。
+- `backend/demo_data/ai_review_scenario/README.md`：材料说明、预设问题和复现步骤。
+
+真实模型配置写入 `backend/.env`，不要提交 API Key：
+
+```text
+COSMOS_API_KEY=your_api_key
+COSMOS_MODEL=deepseek-ai/DeepSeek-V4-Flash
+```
+
+也可以使用环境变量覆盖。未配置 `COSMOS_API_KEY` 时，文档管理和人工流程仍可使用，但 AI 预审会提示不可用。
+
+使用临时数据库运行真实审核闭环：
+
+```powershell
+.\.venv\Scripts\python.exe tools\run-ai-review-smoke.py
+```
+
+脚本依次执行首次预审、人工退回、上传整改稿、复审和人工通过，并生成 `testdata\ai-review-smoke-report.json`。该命令会真实调用模型并消耗 API 额度，但不会修改当前演示数据库。
+
+浏览器里的逐步操作见 [`docs/testing-guide.md`](docs/testing-guide.md) 第 5.7 节；审核模板字段和扩展方式见 [`docs/ai-review-templates.md`](docs/ai-review-templates.md)。
 
 ### 表格协作
 
@@ -56,8 +99,8 @@
 
 仓库使用根目录下的 `.venv` 作为本项目的 Python 虚拟环境：
 
-| 环境     | 用途     | 主要依赖                                                    | 对应代码     |
-| ------ | ------ | ------------------------------------------------------- | -------- |
+| 环境      | 用途    | 主要依赖                                                    | 对应代码       |
+| ------- | ----- | ------------------------------------------------------- | ---------- |
 | `.venv` | 本项目后端 | Flask、Flask-SQLAlchemy、Flask-Migrate、Flask-Login、pytest | `backend/` |
 
 该环境的 `include-system-site-packages` 是 `false`，不会继承 Anaconda base 里的包。
@@ -84,9 +127,11 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned
 ```powershell
 .\.venv\Scripts\python.exe -m pip install -r backend\requirements.txt
 .\.venv\Scripts\python.exe -m flask --app backend\run.py db upgrade
-.\.venv\Scripts\python.exe -m flask --app backend\run.py seed
+.\.venv\Scripts\python.exe -m flask --app backend\run.py demo-reset --yes
 .\.venv\Scripts\python.exe backend\run.py
 ```
+
+`demo-reset --yes` 会清空本地演示数据库和 `backend/media/`，再写入新的数据库课程审核场景。只需要补建缺失数据时可改用 `seed`。
 
 默认账号：
 
@@ -108,10 +153,10 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned
 
 `http://127.0.0.1:5000/` 是原型入口页，展示三个已完成的业务模块：
 
-| 原型       | 入口                                           | 说明                            |
-| -------- | -------------------------------------------- | ----------------------------- |
+| 原型       | 入口                                           | 说明                         |
+| -------- | -------------------------------------------- | -------------------------- |
 | 文档管理模块原型 | `http://127.0.0.1:5000/documents/index.html` | 分类与文档卡片 / 新建并生成 v1 / 版本与下载 |
-| 问答管理模块原型 | `http://127.0.0.1:5000/qa/index.html`        | 讨论流 / 时间线 / 意见汇总 / 结论与治理 |
+| 问答管理模块原型 | `http://127.0.0.1:5000/qa/index.html`        | 讨论流 / 时间线 / 意见汇总 / 结论与治理   |
 | 表格协作模块原型 | `http://127.0.0.1:5000/table/index.html`     | 空白或文件导入 / 行内编辑 / 公式 / 版本回滚 |
 
 先启动后端：
@@ -190,7 +235,7 @@ Stop-Process -Id <占用端口的 PID>
 当前完整测试集：
 
 ```text
-221 passed
+227 passed
 ```
 
 ## 数据库迁移

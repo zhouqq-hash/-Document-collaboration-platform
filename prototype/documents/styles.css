@@ -1548,6 +1548,32 @@ td.notice::before {
   background: currentColor;
 }
 
+.review-card-state {
+  padding: 2px 7px;
+  border: 1px solid var(--line-strong);
+  border-radius: 2px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.review-card-warning {
+  border-color: var(--warn-border);
+  background: var(--warn-bg);
+  color: var(--warn-text);
+}
+
+.review-card-success {
+  border-color: var(--ok-border);
+  background: var(--ok-bg);
+  color: var(--ok-text);
+}
+
+.review-card-info {
+  border-color: var(--ink-tint);
+  background: var(--ink-soft);
+  color: var(--ink-deep);
+}
+
 .status-active {
   background: var(--ink-soft);
   color: var(--ink-deep);
@@ -1767,6 +1793,219 @@ td.notice::before {
 
 /* ------------------------------------------------------------------ AI 问答 / 预审 */
 
+.review-workflow {
+  position: relative;
+  margin-bottom: 18px;
+  padding: 18px 20px 18px 24px;
+  border: 1px solid var(--line-strong);
+  border-left: 5px solid var(--ink);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+}
+
+.review-workflow-warning {
+  border-left-color: var(--warn-line);
+  background: linear-gradient(90deg, var(--warn-bg), var(--surface) 55%);
+}
+
+.review-workflow-success {
+  border-left-color: var(--ok-line);
+  background: linear-gradient(90deg, var(--ok-bg), var(--surface) 55%);
+}
+
+.review-workflow-danger {
+  border-left-color: var(--danger);
+  background: linear-gradient(90deg, var(--cinnabar-soft), var(--surface) 55%);
+}
+
+.review-workflow-info {
+  border-left-color: var(--ink);
+}
+
+.review-workflow-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.review-workflow-head strong {
+  color: var(--heading);
+  font-family: var(--serif, "Noto Serif SC", "Songti SC", serif);
+  font-size: 20px;
+}
+
+.review-workflow-kicker {
+  padding: 2px 7px;
+  border: 1px solid var(--line-strong);
+  border-radius: 2px;
+  color: var(--muted);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+}
+
+.review-workflow p {
+  margin: 4px 0 12px;
+  color: var(--text);
+  line-height: 1.7;
+}
+
+.review-workflow .actions {
+  margin-top: 0;
+}
+
+.review-resubmit-context {
+  margin: 14px 0;
+  padding: 14px 16px;
+  border: 1px solid var(--warn-border);
+  border-left: 4px solid var(--warn-line);
+  border-radius: var(--radius-sm);
+  background: var(--warn-bg);
+}
+
+.review-resubmit-context strong {
+  color: var(--warn-text);
+}
+
+.review-resubmit-context ul {
+  margin: 8px 0;
+  padding-left: 20px;
+}
+
+.review-evidence {
+  margin: 8px 0;
+  padding: 8px 10px;
+  border-left: 3px solid var(--ink-tint);
+  background: var(--ink-soft);
+  color: var(--ink-deep);
+  font-size: 13px;
+}
+
+.checklist-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  padding: 9px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  font-size: 13px;
+}
+
+.checklist-count,
+.checklist-status {
+  padding: 2px 7px;
+  border: 1px solid var(--line-strong);
+  border-radius: 2px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.checklist-pass {
+  border-color: var(--ok-border);
+  background: var(--ok-bg);
+  color: var(--ok-text);
+}
+
+.checklist-fail {
+  border-color: var(--cinnabar-tint);
+  background: var(--cinnabar-soft);
+  color: var(--cinnabar-deep);
+}
+
+.checklist-unknown {
+  border-color: var(--warn-border);
+  background: var(--warn-bg);
+  color: var(--warn-text);
+}
+
+.checklist-results {
+  display: grid;
+  gap: 9px;
+}
+
+.checklist-result {
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+
+.checklist-result.checklist-pass {
+  border-left-color: var(--ok-line);
+  background: var(--surface);
+}
+
+.checklist-result.checklist-fail {
+  border-left-color: var(--cinnabar);
+  background: var(--surface);
+}
+
+.checklist-result.checklist-unknown {
+  border-left-color: var(--warn-line);
+  background: var(--surface);
+}
+
+.checklist-result-head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+
+.checklist-result-head strong {
+  color: var(--heading);
+}
+
+.checklist-location {
+  margin: 4px 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.checklist-result p {
+  margin: 6px 0;
+  line-height: 1.65;
+}
+
+.review-previous-checks {
+  border-top: 1px solid var(--line);
+  padding-top: 14px;
+}
+
+.version-review-state {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: 3px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.version-review-approved {
+  border-color: var(--ok-border);
+  background: var(--ok-bg);
+  color: var(--ok-text);
+}
+
+.version-review-returned {
+  border-color: var(--warn-border);
+  background: var(--warn-bg);
+  color: var(--warn-text);
+}
+
+.version-review-pending {
+  border-color: var(--ink-tint);
+  background: var(--ink-soft);
+  color: var(--ink-deep);
+}
+
 .ai-card {
   padding-bottom: 22px;
 }
@@ -1917,6 +2156,11 @@ td.notice::before {
 
 .review-summary strong {
   flex: 1 1 100%;
+}
+
+.review-summary .actions {
+  flex: 1 1 100%;
+  margin-top: 2px;
 }
 
 .review-summary.verdict-pass {
@@ -2116,6 +2360,102 @@ td.notice::before {
   margin-left: auto;
   color: var(--muted);
   font-size: 13px;
+}
+
+.has-confirm-modal {
+  overflow: hidden;
+}
+
+.confirm-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(29, 40, 51, 0.42);
+  backdrop-filter: blur(3px);
+}
+
+.confirm-dialog {
+  width: min(460px, calc(100vw - 48px));
+  padding: 24px 26px 22px;
+  border: 1px solid var(--line-strong);
+  border-top: 3px solid var(--ink);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-pop);
+}
+
+.confirm-dialog-kicker {
+  margin-bottom: 5px;
+  color: var(--cinnabar);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+}
+
+.confirm-dialog h2 {
+  margin: 0 0 10px;
+  color: var(--heading);
+  font-family: var(--font-display);
+  font-size: 23px;
+  line-height: 1.35;
+}
+
+.confirm-dialog p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.75;
+}
+
+.confirm-dialog-verdict {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 17px;
+  padding: 11px 13px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  font-size: 13px;
+}
+
+.confirm-dialog-verdict span {
+  color: var(--muted);
+}
+
+.confirm-dialog-verdict strong {
+  color: var(--heading);
+}
+
+.confirm-dialog-verdict.verdict-risk strong {
+  color: var(--danger);
+}
+
+.confirm-dialog-verdict.verdict-unknown strong {
+  color: var(--warn-text);
+}
+
+.confirm-dialog .confirm-dialog-warning {
+  margin-top: 10px;
+  color: var(--warn-text);
+  font-size: 13px;
+}
+
+.confirm-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 22px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .confirm-modal {
+    backdrop-filter: none;
+  }
 }
 
 .review-verdict.status-pending {

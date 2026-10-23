@@ -103,10 +103,19 @@ class DocumentCategory(db.Model):
     created_at = db.Column(db.DateTime, default=utcnow, nullable=True)
     # 该分类默认参考的规范文档 ID 列表（最多 3 个，由预审服务限制）
     default_spec_document_ids = db.Column(db.JSON, nullable=True, default=list)
+    review_template_key = db.Column(
+        db.String(64),
+        nullable=False,
+        default="generic_document_v1",
+        server_default="generic_document_v1",
+    )
 
     documents = db.relationship("Document", back_populates="category")
 
     def to_dict(self):
+        from . import review_templates
+
+        template = review_templates.get_template(self.review_template_key)
         spec_ids = []
         for value in self.default_spec_document_ids or []:
             try:
@@ -127,6 +136,9 @@ class DocumentCategory(db.Model):
             "document_count": len(self.documents),
             "default_spec_document_ids": spec_ids,
             "default_spec_documents": spec_documents,
+            "review_template_key": template["key"],
+            "review_template_name": template["name"],
+            "review_template_version": template["version"],
             "created_at": iso_utc(self.created_at),
         }
 
@@ -168,6 +180,158 @@ class Document(db.Model):
     def current_version(self):
         return self.versions[0] if self.versions else None
 
+    @property
+    def latest_review(self):
+        """返回整份文档最近的一条预审记录。"""
+        reviews = [
+            review
+            for version in self.versions
+            for review in version.ai_reviews
+        ]
+        if not reviews:
+            return None
+        return max(reviews, key=lambda item: (item.created_at, item.id))
+
+    @property
+    def review_state(self):
+        """根据当前版本和预审记录推导出文档的审核工作流状态。
+
+        审核状态独立于文档的业务状态（正常 / 归档 / 废弃），避免把
+        “待修改”和“已废弃”混成同一个枚举。
+        """
+        current = self.current_version
+        if current is None:
+            return {
+                "code": "unreviewed",
+                "label": "未预审",
+                "tone": "neutral",
+                "version_id": None,
+                "version_number": None,
+                "review_id": None,
+                "note": "",
+            }
+
+        current_reviews = list(current.ai_reviews)
+        if current_reviews:
+            latest = max(
+                current_reviews,
+                key=lambda item: (item.created_at, item.id),
+            )
+            status = latest.status or "pending"
+            decision = latest.human_decision or "pending"
+            if status in {"pending", "running"}:
+                code, label, tone = "reviewing", "预审中", "info"
+            elif decision == "pass":
+                code, label, tone = "approved", "已通过", "success"
+            elif decision == "return":
+                code, label, tone = (
+                    "changes_required",
+                    "待修改",
+                    "warning",
+                )
+            elif status == "skipped":
+                if latest.previous_review_id:
+                    code, label, tone = (
+                        "resubmitted",
+                        "已重新提交，待复审",
+                        "info",
+                    )
+                else:
+                    code, label, tone = (
+                        "review_unavailable",
+                        "预审未执行",
+                        "muted",
+                    )
+            elif status == "failed":
+                if latest.previous_review_id:
+                    code, label, tone = (
+                        "resubmitted",
+                        "已重新提交，待复审",
+                        "info",
+                    )
+                else:
+                    code, label, tone = "review_failed", "预审失败", "danger"
+            else:
+                code, label, tone = (
+                    "awaiting_confirmation",
+                    "待负责人确认",
+                    "info",
+                )
+            return {
+                "code": code,
+                "label": label,
+                "tone": tone,
+                "version_id": current.id,
+                "version_number": current.version_number,
+                "review_id": latest.id,
+                "note": (
+                    latest.previous_review.human_note
+                    if code == "resubmitted" and latest.previous_review
+                    else latest.human_note or ""
+                ),
+                "error": latest.error_message or "",
+                "previous_review_id": latest.previous_review_id,
+                "actor": (
+                    latest.human_reviewer.to_dict()
+                    if latest.human_reviewer
+                    else None
+                ),
+                "updated_at": iso_utc(
+                    latest.human_reviewed_at
+                    or latest.finished_at
+                    or latest.created_at
+                ),
+            }
+
+        # 新版本可能还没生成预审记录。若上一版被退回，当前版本就是一个
+        # 明确的“已重新提交、待复审”待办，而不是重新回到“未预审”。
+        returned = [
+            review
+            for version in self.versions
+            if version.version_number < current.version_number
+            for review in version.ai_reviews
+            if review.human_decision == "return"
+        ]
+        if returned:
+            latest = max(
+                returned, key=lambda item: (item.created_at, item.id)
+            )
+            return {
+                "code": "resubmitted",
+                "label": "已重新提交，待复审",
+                "tone": "info",
+                "version_id": current.id,
+                "version_number": current.version_number,
+                "review_id": None,
+                "previous_review_id": latest.id,
+                "previous_version_number": (
+                    latest.version.version_number
+                    if latest.version
+                    else None
+                ),
+                "note": latest.human_note or "",
+                "error": "",
+                "previous_review_id": latest.id,
+                "actor": (
+                    latest.human_reviewer.to_dict()
+                    if latest.human_reviewer
+                    else None
+                ),
+                "updated_at": iso_utc(
+                    latest.human_reviewed_at or latest.created_at
+                ),
+            }
+
+        return {
+            "code": "unreviewed",
+            "label": "未预审",
+            "tone": "neutral",
+            "version_id": current.id,
+            "version_number": current.version_number,
+            "review_id": None,
+            "note": "",
+        }
+
     def to_dict(self, include_versions=False):
         data = {
             "id": self.id,
@@ -180,6 +344,7 @@ class Document(db.Model):
             "updated_at": iso_utc(self.updated_at),
             "description": self.description,
             "status": self.status,
+            "review_state": self.review_state,
         }
         if include_versions:
             data["versions"] = [v.to_dict() for v in self.versions]
@@ -207,9 +372,21 @@ class DocumentVersion(db.Model):
 
     document = db.relationship("Document", back_populates="versions")
     uploader = db.relationship("User", back_populates="uploaded_versions")
-    ai_reviews = db.relationship("DocumentAiReview", back_populates="version")
+    ai_reviews = db.relationship(
+        "DocumentAiReview",
+        back_populates="version",
+        order_by=(
+            "DocumentAiReview.created_at.desc(), "
+            "DocumentAiReview.id.desc()"
+        ),
+    )
+
+    @property
+    def latest_review(self):
+        return self.ai_reviews[0] if self.ai_reviews else None
 
     def to_dict(self):
+        latest = self.latest_review
         return {
             "id": self.id,
             "document_id": self.document_id,
@@ -218,6 +395,24 @@ class DocumentVersion(db.Model):
             "changelog": self.changelog,
             "uploader": self.uploader.to_dict(),
             "created_at": iso_utc(self.created_at),
+            "review": (
+                {
+                    "id": latest.id,
+                    "verdict": latest.verdict or "unknown",
+                    "human_decision": latest.human_decision or "pending",
+                    "human_note": latest.human_note or "",
+                    "human_reviewer": (
+                        latest.human_reviewer.to_dict()
+                        if latest.human_reviewer
+                        else None
+                    ),
+                    "human_reviewed_at": iso_utc(
+                        latest.human_reviewed_at
+                    ),
+                }
+                if latest
+                else None
+            ),
         }
 
 
@@ -235,6 +430,11 @@ class DocumentAiReview(db.Model):
         nullable=False,
         index=True,
     )
+    previous_review_id = db.Column(
+        db.Integer,
+        db.ForeignKey("document_ai_reviews.id"),
+        nullable=True,
+    )
     requester_id = db.Column(
         db.Integer, db.ForeignKey("users.id"), nullable=False
     )
@@ -243,6 +443,14 @@ class DocumentAiReview(db.Model):
     )
     source = db.Column(db.String(16), nullable=False, default="manual")
     spec_document_ids = db.Column(db.JSON, nullable=True, default=list)
+    review_template_key = db.Column(
+        db.String(64),
+        nullable=False,
+        default="generic_document_v1",
+        server_default="generic_document_v1",
+    )
+    review_template_version = db.Column(db.String(16), default="1.0")
+    checklist_json = db.Column(db.JSON, nullable=True, default=list)
     model = db.Column(db.String(120), default="")
     verdict = db.Column(db.String(16), nullable=False, default="unknown")
     result_json = db.Column(db.Text, nullable=False, default="{}")
@@ -263,16 +471,26 @@ class DocumentAiReview(db.Model):
 
     document = db.relationship("Document", back_populates="ai_reviews")
     version = db.relationship("DocumentVersion", back_populates="ai_reviews")
+    previous_review = db.relationship(
+        "DocumentAiReview",
+        remote_side=[id],
+        foreign_keys=[previous_review_id],
+    )
     requester = db.relationship("User", foreign_keys=[requester_id])
     human_reviewer = db.relationship(
         "User", foreign_keys=[human_reviewer_id]
     )
 
     def to_dict(self):
+        from . import review_templates
+
         try:
             result = json.loads(self.result_json or "{}")
         except (TypeError, ValueError):
             result = {}
+        template = review_templates.get_template(
+            self.review_template_key
+        )
         spec_ids = []
         for value in self.spec_document_ids or []:
             try:
@@ -286,10 +504,24 @@ class DocumentAiReview(db.Model):
             "version_number": (
                 self.version.version_number if self.version else None
             ),
+            "previous_review_id": self.previous_review_id,
+            "previous_review": (
+                self.previous_review.to_summary()
+                if self.previous_review
+                else None
+            ),
             "requester": self.requester.to_dict() if self.requester else None,
             "status": self.status or "pending",
             "source": self.source or "manual",
             "spec_document_ids": spec_ids,
+            "review_template_key": (
+                self.review_template_key or "generic_document_v1"
+            ),
+            "review_template_version": (
+                self.review_template_version or "1.0"
+            ),
+            "review_template_name": template["name"],
+            "checklist": self.checklist_json or [],
             "model": self.model or "",
             "verdict": self.verdict or "unknown",
             "result": result,
@@ -298,6 +530,32 @@ class DocumentAiReview(db.Model):
             "finished_at": iso_utc(self.finished_at),
             "human_decision": self.human_decision or "pending",
             "human_note": self.human_note or "",
+            "human_reviewer": (
+                self.human_reviewer.to_dict()
+                if self.human_reviewer
+                else None
+            ),
+            "human_reviewed_at": iso_utc(self.human_reviewed_at),
+            "created_at": iso_utc(self.created_at),
+        }
+
+    def to_summary(self):
+        try:
+            result = json.loads(self.result_json or "{}")
+        except (TypeError, ValueError):
+            result = {}
+        issues = result.get("issues")
+        if not isinstance(issues, list):
+            issues = []
+        return {
+            "id": self.id,
+            "version_id": self.version_id,
+            "version_number": (
+                self.version.version_number if self.version else None
+            ),
+            "human_decision": self.human_decision or "pending",
+            "human_note": self.human_note or "",
+            "issues": issues,
             "human_reviewer": (
                 self.human_reviewer.to_dict()
                 if self.human_reviewer

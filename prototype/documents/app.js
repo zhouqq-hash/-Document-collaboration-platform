@@ -62,6 +62,233 @@ function statusBadge(status) {
   return `<span class="status-badge status-${status}">${escapeHtml(label)}</span>`;
 }
 
+function reviewStateBadge(state) {
+  if (!state || state.code === "unreviewed") {
+    return "";
+  }
+  return `<span class="review-card-state review-card-${state.tone || "neutral"}">${escapeHtml(
+    REVIEW_WORKFLOW_LABELS[state.code] || state.label || "预审"
+  )}</span>`;
+}
+
+const REVIEW_WORKFLOW_LABELS = {
+  unreviewed: "未预审",
+  reviewing: "预审中",
+  awaiting_confirmation: "待负责人确认",
+  changes_required: "待修改",
+  resubmitted: "已重新提交，待复审",
+  approved: "已通过",
+  review_unavailable: "预审未执行",
+  review_failed: "预审失败",
+};
+
+function latestReview(reviews) {
+  return [...reviews].sort((left, right) => {
+    const timeDiff =
+      new Date(right.created_at || 0).getTime() -
+      new Date(left.created_at || 0).getTime();
+    return timeDiff || Number(right.id || 0) - Number(left.id || 0);
+  })[0] || null;
+}
+
+function reviewWorkflowState(doc, reviews = []) {
+  const current = doc.current_version;
+  if (!current) {
+    return { code: "unreviewed", tone: "neutral", note: "" };
+  }
+
+  const currentReview = latestReview(
+    reviews.filter(
+      (item) => String(item.version_id) === String(current.id)
+    )
+  );
+  if (currentReview) {
+    const status = currentReview.status || "done";
+    if (["pending", "running"].includes(status)) {
+      return { code: "reviewing", tone: "info", review: currentReview };
+    }
+    if (currentReview.human_decision === "pass") {
+      return { code: "approved", tone: "success", review: currentReview };
+    }
+    if (currentReview.human_decision === "return") {
+      return {
+        code: "changes_required",
+        tone: "warning",
+        review: currentReview,
+        note: currentReview.human_note || "",
+      };
+    }
+    if (status === "skipped") {
+      if (currentReview.previous_review_id) {
+        return {
+          code: "resubmitted",
+          tone: "info",
+          review: currentReview,
+          previousReview: currentReview.previous_review,
+          note:
+            currentReview.previous_review?.human_note ||
+            currentReview.human_note ||
+            "",
+          error: currentReview.error || "",
+        };
+      }
+      return { code: "review_unavailable", tone: "muted", review: currentReview };
+    }
+    if (status === "failed") {
+      if (currentReview.previous_review_id) {
+        return {
+          code: "resubmitted",
+          tone: "info",
+          review: currentReview,
+          previousReview: currentReview.previous_review,
+          note:
+            currentReview.previous_review?.human_note ||
+            currentReview.human_note ||
+            "",
+          error: currentReview.error || "",
+        };
+      }
+      return { code: "review_failed", tone: "danger", review: currentReview };
+    }
+    return {
+      code: "awaiting_confirmation",
+      tone: "info",
+      review: currentReview,
+    };
+  }
+
+  const returned = latestReview(
+    reviews.filter(
+      (item) =>
+        Number(item.version_number || 0) <
+          Number(current.version_number || 0) &&
+        item.human_decision === "return"
+    )
+  );
+  if (returned) {
+    return {
+      code: "resubmitted",
+      tone: "info",
+      previousReview: returned,
+      note: returned.human_note || "",
+    };
+  }
+
+  if (doc.review_state?.code) {
+    return {
+      ...doc.review_state,
+      code: doc.review_state.code,
+    };
+  }
+  return { code: "unreviewed", tone: "neutral", note: "" };
+}
+
+function reviewWorkflowDescription(doc, state) {
+  const version = doc.current_version
+    ? `v${doc.current_version.version_number}`
+    : "当前文档";
+  if (state.code === "changes_required") {
+    return `负责人已退回 ${version}，请按意见修改后重新上传。${
+      state.note ? `退回意见：${state.note}` : ""
+    }`;
+  }
+  if (state.code === "resubmitted") {
+    return `${version} 已重新提交，系统将对照上次退回意见复审。${
+      state.note ? `上次意见：${state.note}` : ""
+    }${state.error ? ` 当前预审提示：${state.error}` : ""}`;
+  }
+  if (state.code === "reviewing") {
+    return `${version} 正在执行 AI 预审，结果完成后由负责人确认。`;
+  }
+  if (state.code === "awaiting_confirmation") {
+    return `${version} 的 AI 预审已完成，等待负责人确认是否通过。`;
+  }
+  if (state.code === "approved") {
+    const reviewer = state.review?.human_reviewer?.name;
+    return `${version} 已通过负责人确认${reviewer ? `（${reviewer}）` : ""}。`;
+  }
+  if (state.code === "review_unavailable") {
+    return `${version} 尚未完成预审，请检查 AI 配置后重新发起。`;
+  }
+  if (state.code === "review_failed") {
+    return `${version} 的预审执行失败，请查看失败原因后重试。`;
+  }
+  return `${version} 还没有预审记录。负责人可以先选择规范并开始预审。`;
+}
+
+function reviewWorkflowBannerHtml(doc, state, canManage) {
+  const label = REVIEW_WORKFLOW_LABELS[state.code] || "未预审";
+  const current = doc.current_version;
+  const resultsLink =
+    '<a class="btn btn-outline btn-sm" href="#reviewSection">查看预审</a>';
+  let actions = resultsLink;
+  if (state.code === "changes_required" && canManage && current) {
+    actions = `
+      <a class="btn btn-primary btn-sm" href="upload-version.html?id=${doc.id}">按意见上传新版本</a>
+      ${resultsLink}
+    `;
+  } else if (state.code === "unreviewed" && canManage) {
+    actions = '<a class="btn btn-primary btn-sm" href="#reviewSection">开始预审</a>';
+  } else if (state.code === "resubmitted" && canManage) {
+    actions = `
+      <a class="btn btn-primary btn-sm" href="#reviewSection">发起复审</a>
+      ${resultsLink}
+    `;
+  } else if (
+    ["review_unavailable", "review_failed"].includes(state.code) &&
+    canManage
+  ) {
+    actions = `
+      <a class="btn btn-primary btn-sm" href="#reviewSection">检查并重新预审</a>
+      ${resultsLink}
+    `;
+  } else if (state.code === "approved") {
+    actions = `<a class="btn btn-outline btn-sm" href="versions.html?id=${doc.id}">查看审核记录</a>`;
+  }
+
+  return `
+    <section class="review-workflow review-workflow-${state.tone || "neutral"}">
+      <div class="review-workflow-head">
+        <span class="review-workflow-kicker">预审流程</span>
+        <strong>${escapeHtml(label)}</strong>
+        ${current ? `<span class="muted">当前 v${current.version_number}</span>` : ""}
+      </div>
+      <p>${escapeHtml(reviewWorkflowDescription(doc, state))}</p>
+      <div class="actions">${actions}</div>
+    </section>
+  `;
+}
+
+function updateReviewWorkflowBanner(doc, reviews, canManage) {
+  const container = document.getElementById("reviewWorkflowBanner");
+  if (!container) {
+    return;
+  }
+  const state = reviewWorkflowState(doc, reviews);
+  container.innerHTML = `
+    ${
+      qs("resubmitted") === "1"
+        ? '<div class="notice notice-ok">新版本已提交。系统已保留上次退回意见，并会用于本次复审。</div>'
+        : ""
+    }
+    ${reviewWorkflowBannerHtml(doc, state, canManage)}
+  `;
+}
+
+function versionReviewBadge(version) {
+  const review = version.review;
+  if (!review) {
+    return '<span class="version-review-state">未预审</span>';
+  }
+  if (review.human_decision === "pass") {
+    return '<span class="version-review-state version-review-approved">已通过负责人确认</span>';
+  }
+  if (review.human_decision === "return") {
+    return '<span class="version-review-state version-review-returned">已退回修改</span>';
+  }
+  return '<span class="version-review-state version-review-pending">待人工确认</span>';
+}
+
 
 function createSearchableSelect({
   options = [],
@@ -953,6 +1180,7 @@ async function initDocuments() {
                     document.category.name
                   )}</span>
                   ${statusBadge(document.status)}
+                  ${reviewStateBadge(document.review_state)}
                 </span>
                 <strong class="document-card-title">${escapeHtml(
                   document.title
@@ -1002,6 +1230,13 @@ async function initDocumentDetail() {
 
     document.getElementById("pageTitle").textContent = doc.title;
     container.innerHTML = `
+      <div id="reviewWorkflowBanner">
+        ${reviewWorkflowBannerHtml(
+          doc,
+          reviewWorkflowState(doc),
+          canUpload
+        )}
+      </div>
       <div class="card">
         <dl class="detail-list">
           <dt>文档标题</dt><dd>${escapeHtml(doc.title)}</dd>
@@ -1032,6 +1267,14 @@ async function initDocumentDetail() {
         </div>
       </div>
     `;
+
+    if (qs("resubmitted") === "1") {
+      const banner = document.getElementById("reviewWorkflowBanner");
+      banner.insertAdjacentHTML(
+        "afterbegin",
+        '<div class="notice notice-ok">新版本已提交。系统已保留上次退回意见，并会用于本次复审。</div>'
+      );
+    }
 
     // 与问答模块打通：话题里回写到本文档的最终结论
     const decisionSection = document.createElement("section");
@@ -1215,13 +1458,16 @@ async function initDocumentAiPanels(doc, canReview) {
 
   // ---------------- AI 预审 ----------------
   const reviewSection = document.createElement("section");
+  reviewSection.id = "reviewSection";
   reviewSection.className = "card ai-card";
   reviewSection.innerHTML = `
     <div class="card-head">
       <h2>AI 预审</h2>
-      <span class="ai-tag">管理员 / 文档负责人</span>
+      <span class="ai-tag">${escapeHtml(
+        doc.category.review_template_name || "通用文档质量检查"
+      )} · 管理员 / 文档负责人</span>
     </div>
-    <p class="muted ai-help">检查前后矛盾、与上一版的差异，并可按需对照参考规范。预审结果会留档。</p>
+    <p class="muted ai-help">按当前分类的审核模板逐项检查，结果保留原文依据；最终由负责人确认。</p>
     <div class="review-controls">
       <div class="review-specs">
         <div class="field-label">参考规范（可选，最多 3 份）</div>
@@ -1331,6 +1577,75 @@ async function initDocumentAiPanels(doc, canReview) {
     return review.error || reviewStatusLabel(review);
   }
 
+  function promptHumanPassConfirmation(review) {
+    const verdict = review.result?.verdict || review.verdict || "unknown";
+    const summary = review.result?.checklist_summary || {};
+    const attentionCount =
+      Number(summary.fail || 0) + Number(summary.unknown || 0);
+
+    return new Promise((resolve) => {
+      const returnFocusTo = document.activeElement;
+      const modal = document.createElement("div");
+      modal.className = "confirm-modal";
+      modal.innerHTML = `
+        <section class="confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="humanPassTitle" aria-describedby="humanPassDescription">
+          <div class="confirm-dialog-kicker">人工确认</div>
+          <h2 id="humanPassTitle">确认通过这份文档？</h2>
+          <p id="humanPassDescription">
+            通过后，当前版本将标记为“已通过”，并记录确认账号、时间和备注。
+            请先核对检查清单、原文依据和需要处理的事项。
+          </p>
+          <div class="confirm-dialog-verdict ${verdictClass(verdict)}">
+            <span>AI 预审结论</span>
+            <strong>${escapeHtml(verdictLabel(verdict))}</strong>
+          </div>
+          ${
+            attentionCount
+              ? `<p class="confirm-dialog-warning">当前仍有 ${attentionCount} 项不通过或待确认，请确认已完成人工核验。</p>`
+              : ""
+          }
+          <div class="confirm-dialog-actions">
+            <button class="btn btn-outline" type="button" data-confirm-cancel>再检查一下</button>
+            <button class="btn btn-primary" type="button" data-confirm-pass>确认通过</button>
+          </div>
+        </section>
+      `;
+
+      const close = (confirmed) => {
+        document.removeEventListener("keydown", handleKeydown);
+        document.body.classList.remove("has-confirm-modal");
+        modal.remove();
+        if (returnFocusTo instanceof HTMLElement) {
+          returnFocusTo.focus();
+        }
+        resolve(confirmed);
+      };
+      const handleKeydown = (event) => {
+        if (event.key === "Escape") {
+          event.preventDefault();
+          close(false);
+        }
+      };
+
+      modal.addEventListener("click", (event) => {
+        if (event.target === modal) {
+          close(false);
+        }
+      });
+      modal
+        .querySelector("[data-confirm-cancel]")
+        .addEventListener("click", () => close(false));
+      modal
+        .querySelector("[data-confirm-pass]")
+        .addEventListener("click", () => close(true));
+
+      document.body.classList.add("has-confirm-modal");
+      document.body.appendChild(modal);
+      document.addEventListener("keydown", handleKeydown);
+      modal.querySelector("[data-confirm-cancel]").focus();
+    });
+  }
+
   function renderReview(review) {
     if ((review.status || "done") !== "done") {
       const status = review.status || "pending";
@@ -1359,6 +1674,13 @@ async function initDocumentAiPanels(doc, canReview) {
       ? result.spec_checks
       : [];
     const changes = Array.isArray(result.changes) ? result.changes : [];
+    const previousChecks = Array.isArray(result.previous_issue_checks)
+      ? result.previous_issue_checks
+      : [];
+    const checkResults = Array.isArray(result.check_results)
+      ? result.check_results
+      : [];
+    const checklistSummary = result.checklist_summary || {};
 
     const issueHtml = issues.length
       ? issues
@@ -1377,6 +1699,11 @@ async function initDocumentAiPanels(doc, canReview) {
                   ${issue.location ? `<span class="muted">${escapeHtml(issue.location)}</span>` : ""}
                 </div>
                 <p>${escapeHtml(issue.description || "")}</p>
+                ${
+                  issue.evidence
+                    ? `<p class="review-evidence">依据：${escapeHtml(issue.evidence)}</p>`
+                    : ""
+                }
                 ${issue.suggestion ? `<p class="review-suggestion">建议：${escapeHtml(issue.suggestion)}</p>` : ""}
               </div>
             `;
@@ -1411,6 +1738,105 @@ async function initDocumentAiPanels(doc, canReview) {
           .join("")}</ul>`
       : '<p class="muted">没有识别到明确的版本变化。</p>';
 
+    const previousChecksHtml =
+      review.previous_review_id || previousChecks.length
+        ? `
+          <div class="review-block review-previous-checks">
+            <h3>上次退回问题复核</h3>
+            ${
+              review.previous_review?.human_note
+                ? `<p class="muted">上次意见：${escapeHtml(review.previous_review.human_note)}</p>`
+                : ""
+            }
+            ${
+              previousChecks.length
+                ? `<ul class="review-check-list">${previousChecks
+                    .map((item) => {
+                      const status = [
+                        "resolved",
+                        "unresolved",
+                        "unclear",
+                      ].includes(item.status)
+                        ? item.status
+                        : "unclear";
+                      const statusText = {
+                        resolved: "已解决",
+                        unresolved: "未解决",
+                        unclear: "待确认",
+                      }[status];
+                      return `
+                        <li>
+                          <span class="check-mark ${status === "resolved" ? "ok" : "bad"}">${statusText}</span>
+                          <strong>${escapeHtml(item.issue || "上次退回问题")}</strong>
+                          ${item.note ? `<span class="muted">${escapeHtml(item.note)}</span>` : ""}
+                        </li>
+                      `;
+                    })
+                    .join("")}</ul>`
+                : '<p class="muted">尚无逐项核对结果，请人工确认上次问题是否已处理。</p>'
+            }
+          </div>
+        `
+        : "";
+
+    const checklistHtml = checkResults.length
+      ? `
+        <div class="checklist-summary">
+          <strong>共 ${checkResults.length} 项</strong>
+          <span class="checklist-count checklist-pass">通过 ${checklistSummary.pass || 0}</span>
+          <span class="checklist-count checklist-fail">不通过 ${checklistSummary.fail || 0}</span>
+          <span class="checklist-count checklist-unknown">待确认 ${checklistSummary.unknown || 0}</span>
+        </div>
+        <div class="checklist-results">
+          ${checkResults
+            .map((item) => {
+              const status = ["pass", "fail", "unknown"].includes(item.status)
+                ? item.status
+                : "unknown";
+              const statusText = {
+                pass: "通过",
+                fail: "不通过",
+                unknown: "待确认",
+              }[status];
+              return `
+                <article class="checklist-result checklist-${status}">
+                  <div class="checklist-result-head">
+                    <span class="checklist-status">${statusText}</span>
+                    <strong>${escapeHtml(item.title || item.id || "检查项")}</strong>
+                    <span class="muted">${item.required ? "必检" : "选检"} · ${
+                      item.severity === "high"
+                        ? "高"
+                        : item.severity === "medium"
+                          ? "中"
+                          : "低"
+                    }</span>
+                  </div>
+                  ${
+                    item.location
+                      ? `<p class="checklist-location">位置：${escapeHtml(item.location)}</p>`
+                      : ""
+                  }
+                  ${
+                    item.explanation
+                      ? `<p>${escapeHtml(item.explanation)}</p>`
+                      : ""
+                  }
+                  <p class="review-evidence">依据：${escapeHtml(
+                    item.evidence || "未提供可核验依据"
+                  )}</p>
+                  ${
+                    item.suggestion
+                      ? `<p class="review-suggestion">建议：${escapeHtml(item.suggestion)}</p>`
+                      : ""
+                  }
+                </article>
+              `;
+            })
+            .join("")}
+        </div>
+      `
+      : `<div class="notice">本次模型没有返回逐项检查结果，下面展示兼容的旧格式问题列表。</div>`;
+
     resultBox.innerHTML = `
       <div class="review-summary ${verdictClass(verdict)}">
         <span class="review-verdict">${verdictLabel(verdict)}</span>
@@ -1419,15 +1845,23 @@ async function initDocumentAiPanels(doc, canReview) {
           v${review.version_number ?? "-"} · ${formatTime(review.created_at)}
           ${result.context_truncated ? " · 正文已截断" : ""}
         </span>
+        <div class="actions">
+          <a class="btn btn-outline btn-sm" href="download.html?id=${doc.id}&version_id=${review.version_id}">下载 v${review.version_number ?? "-"} 修改</a>
+        </div>
       </div>
       ${
         result.parse_error
           ? `<div class="notice"><div class="review-raw">模型返回的不是标准 JSON，下面是原文：\n${escapeHtml(result.summary || "")}</div></div>`
           : ""
       }
-      <div class="review-block"><h3>发现的问题</h3>${issueHtml}</div>
+      <div class="review-block">
+        <h3>结构化检查清单</h3>
+        ${checklistHtml}
+        ${checkResults.length ? "" : issueHtml}
+      </div>
       <div class="review-block"><h3>规范对照</h3>${specHtml}</div>
       <div class="review-block"><h3>版本变化</h3>${changeHtml}</div>
+      ${previousChecksHtml}
       <div class="review-decision">
         <div class="field-label">人工确认</div>
         ${
@@ -1456,6 +1890,12 @@ async function initDocumentAiPanels(doc, canReview) {
               resultBox.querySelector("#humanReviewNote")?.value.trim() || "";
             if (decision === "return" && !note) {
               alert("退回修改时请填写原因");
+              return;
+            }
+            if (
+              decision === "pass" &&
+              !(await promptHumanPassConfirmation(review))
+            ) {
               return;
             }
 
@@ -1521,6 +1961,9 @@ async function initDocumentAiPanels(doc, canReview) {
       historyBox.innerHTML = loadedReviews.length
         ? loadedReviews.map(renderReviewHistoryItem).join("")
         : '<span class="muted">还没有预审记录。</span>';
+      if (loadedReviews.length) {
+        renderReview(loadedReviews[0]);
+      }
       if (reviewRefreshTimer) {
         clearTimeout(reviewRefreshTimer);
         reviewRefreshTimer = null;
@@ -1532,6 +1975,7 @@ async function initDocumentAiPanels(doc, canReview) {
       ) {
         reviewRefreshTimer = window.setTimeout(loadReviewHistory, 5000);
       }
+      updateReviewWorkflowBanner(doc, loadedReviews, canReview);
     } catch (error) {
       historyBox.innerHTML = `<span class="notice">${escapeHtml(error.message)}</span>`;
     }
@@ -1600,6 +2044,47 @@ async function initUpload() {
     const doc = await apiRequest(`/api/documents/${documentId}`);
     document.getElementById("docTitle").textContent = doc.title;
     backLink.href = `document-detail.html?id=${doc.id}`;
+    const reviews = await apiRequest(
+      `/api/documents/${doc.id}/ai/reviews?limit=10`
+    );
+    const returned = latestReview(
+      reviews.filter(
+        (review) =>
+          review.human_decision === "return" &&
+          Number(review.version_number || 0) <=
+            Number(doc.current_version?.version_number || 0)
+      )
+    );
+    if (returned) {
+      const issues = returned.result?.issues || [];
+      const context = document.getElementById("reviewResubmitContext");
+      context.hidden = false;
+      context.innerHTML = `
+        <div class="review-resubmit-context">
+          <strong>本次是针对性复审提交</strong>
+          <p>上次 v${returned.version_number} 的退回意见：${escapeHtml(
+            returned.human_note || "未填写"
+          )}</p>
+          ${
+            issues.length
+              ? `<ul>${issues
+                  .map(
+                    (issue) =>
+                      `<li>${escapeHtml(
+                        issue.description || issue.category || "退回问题"
+                      )}</li>`
+                  )
+                  .join("")}</ul>`
+              : ""
+          }
+          <p class="muted">上传后系统会把本次版本与上次问题清单一起用于复审。</p>
+        </div>
+      `;
+      document.getElementById("changelog").placeholder =
+        "说明本次如何解决上次退回的问题";
+      form.querySelector('button[type="submit"]').textContent =
+        "上传修订并提交复审";
+    }
   } catch (error) {
     showPageMessage("upload", error.message, true);
     return;
@@ -1628,12 +2113,16 @@ async function initUpload() {
         method: "POST",
         body: formData,
       });
-      window.location.href = `document-detail.html?id=${documentId}`;
+      window.location.href = `document-detail.html?id=${documentId}&resubmitted=1`;
     } catch (error) {
       alert(error.message);
     } finally {
       submitButton.disabled = false;
-      submitButton.textContent = "上传并生成新版本";
+      submitButton.textContent = document.getElementById(
+        "reviewResubmitContext"
+      ).hidden
+        ? "上传并生成新版本"
+        : "上传修订并提交复审";
     }
   });
 }
@@ -1656,6 +2145,7 @@ async function initVersions() {
               <div class="card">
                 <div class="toolbar">
                   <strong>v${version.version_number}</strong>
+                  ${versionReviewBadge(version)}
                   <a class="btn btn-outline" href="download.html?id=${doc.id}&version_id=${version.id}">下载</a>
                 </div>
                 <dl class="detail-list">
@@ -1663,6 +2153,22 @@ async function initVersions() {
                   <dt>变更说明</dt><dd>${escapeHtml(version.changelog || "-")}</dd>
                   <dt>上传人</dt><dd>${escapeHtml(version.uploader.name)}</dd>
                   <dt>上传时间</dt><dd>${formatTime(version.created_at)}</dd>
+                  ${
+                    version.review?.human_reviewed_at
+                      ? `<dt>预审确认</dt><dd>${escapeHtml(
+                          version.review.human_reviewer?.name || "负责人"
+                        )} · ${formatTime(
+                          version.review.human_reviewed_at
+                        )}</dd>`
+                      : ""
+                  }
+                  ${
+                    version.review?.human_note
+                      ? `<dt>审核意见</dt><dd>${escapeHtml(
+                          version.review.human_note
+                        )}</dd>`
+                      : ""
+                  }
                 </dl>
               </div>
             `
@@ -1968,6 +2474,7 @@ async function initManageCategories() {
   const nameInput = document.getElementById("categoryName");
   const sortInput = document.getElementById("sortOrder");
   const specBox = document.getElementById("defaultSpecOptions");
+  const templateSelect = document.getElementById("reviewTemplateSelect");
 
   if (user.role !== "admin") {
     createCard.style.display = "none";
@@ -1979,6 +2486,19 @@ async function initManageCategories() {
   let editingId = null;
   let currentCategories = [];
   let allDocuments = [];
+  let reviewTemplates = [];
+
+  function renderTemplateOptions(templates) {
+    reviewTemplates = templates;
+    templateSelect.innerHTML = templates
+      .map(
+        (template) =>
+          `<option value="${escapeHtml(template.key)}">${escapeHtml(
+            `${template.name}（${template.rule_count}项）`
+          )}</option>`
+      )
+      .join("");
+  }
 
   function renderSpecOptions(selectedIds = []) {
     const selected = new Set((selectedIds || []).map(String));
@@ -2013,6 +2533,7 @@ async function initManageCategories() {
     cancelButton.hidden = true;
     nameInput.value = "";
     sortInput.value = "0";
+    templateSelect.value = "generic_document_v1";
     renderSpecOptions([]);
   }
 
@@ -2039,6 +2560,8 @@ async function initManageCategories() {
         cancelButton.hidden = false;
         nameInput.value = category.name;
         sortInput.value = category.sort_order;
+        templateSelect.value =
+          category.review_template_key || "generic_document_v1";
         renderSpecOptions(category.default_spec_document_ids || []);
         createCard.scrollIntoView({ behavior: "smooth", block: "start" });
       });
@@ -2074,6 +2597,7 @@ async function initManageCategories() {
                 <th>排序</th>
                 <th>文档数</th>
                 <th>默认规范</th>
+                <th>AI 模板</th>
                 <th>创建时间</th>
                 <th>操作</th>
               </tr>
@@ -2093,6 +2617,9 @@ async function initManageCategories() {
                               .join("、")
                           : '<span class="muted">未配置</span>'
                       }</td>
+                      <td>${escapeHtml(
+                        category.review_template_name || "通用文档质量检查"
+                      )}</td>
                       <td>${formatTime(category.created_at)}</td>
                       <td class="actions">${renderActions(category)}</td>
                     </tr>
@@ -2110,7 +2637,11 @@ async function initManageCategories() {
   }
 
   try {
-    allDocuments = await apiRequest("/api/documents");
+    [allDocuments, reviewTemplates] = await Promise.all([
+      apiRequest("/api/documents"),
+      apiRequest("/api/review-templates"),
+    ]);
+    renderTemplateOptions(reviewTemplates);
     renderSpecOptions([]);
   } catch (error) {
     specBox.innerHTML = `<span class="notice">${escapeHtml(error.message)}</span>`;
@@ -2143,6 +2674,7 @@ async function initManageCategories() {
         name,
         sort_order: Number(sortOrder) || 0,
         default_spec_document_ids: defaultSpecIds,
+        review_template_key: templateSelect.value,
       });
       if (editingId) {
         await apiRequest(`/api/categories/${editingId}`, {

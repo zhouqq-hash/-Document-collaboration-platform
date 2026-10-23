@@ -40,6 +40,25 @@ def test_extract_docx_paragraph_and_table():
     assert "课程" in text and "学分" in text
 
 
+def test_extract_docx_preserves_paragraph_table_order():
+    import docx
+
+    document = docx.Document()
+    document.add_heading("课程目标", level=1)
+    table = document.add_table(rows=1, cols=2)
+    table.rows[0].cells[0].text = "D1"
+    table.rows[0].cells[1].text = "能够设计关系模型"
+    document.add_heading("考核方式", level=1)
+    document.add_paragraph("期末闭卷考试 50%")
+    buffer = io.BytesIO()
+    document.save(buffer)
+
+    text = extract_text("syllabus.docx", buffer.getvalue())
+
+    assert text.index("课程目标") < text.index("能够设计关系模型")
+    assert text.index("能够设计关系模型") < text.index("考核方式")
+
+
 def test_extract_xlsx_sheet_and_rows():
     import openpyxl
 

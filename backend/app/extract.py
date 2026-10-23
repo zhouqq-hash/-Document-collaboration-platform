@@ -73,16 +73,23 @@ def _read_pdf(stream):
 def _read_docx(stream):
     try:
         import docx
+        from docx.table import Table
+        from docx.text.paragraph import Paragraph
     except ImportError as exc:
         raise ExtractError(
             "缺少 python-docx，请执行 python -m pip install python-docx"
         ) from exc
 
     document = docx.Document(stream)
-    blocks = [paragraph.text for paragraph in document.paragraphs]
-    for table in document.tables:
-        for row in table.rows:
-            blocks.append("\t".join(cell.text.strip() for cell in row.cells))
+    blocks = []
+    for block in document.iter_inner_content():
+        if isinstance(block, Paragraph):
+            blocks.append(block.text)
+        elif isinstance(block, Table):
+            for row in block.rows:
+                blocks.append(
+                    "\t".join(cell.text.strip() for cell in row.cells)
+                )
     return "\n".join(blocks)
 
 

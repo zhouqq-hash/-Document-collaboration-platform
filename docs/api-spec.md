@@ -159,14 +159,26 @@
 
 ### GET /api/categories
 
-返回分类列表，包含每个分类的文档数量。
+返回分类列表，包含每个分类的文档数量和 AI 预审模板：
+`review_template_key`、`review_template_name`、`review_template_version`。
+
+### GET /api/review-templates
+
+仅管理员。返回可用模板的 key、名称、版本、说明和规则数量。目前提供：
+
+- `generic_document_v1`：通用文档质量检查，4项；
+- `syllabus_v1`：教学大纲规范检查，10项。
 
 ### POST /api/categories
 
 仅管理员。请求：
 
 ```json
-{ "name": "新分类", "sort_order": 10 }
+{
+  "name": "新分类",
+  "sort_order": 10,
+  "review_template_key": "generic_document_v1"
+}
 ```
 
 ### PATCH /api/categories/{id}
@@ -174,8 +186,15 @@
 仅管理员。修改分类名称或排序，字段可选：
 
 ```json
-{ "name": "新名称", "sort_order": 5 }
+{
+  "name": "新名称",
+  "sort_order": 5,
+  "review_template_key": "syllabus_v1"
+}
 ```
+
+`review_template_key` 不存在时返回 400 `invalid_template`。未显式指定的新分类使用
+`generic_document_v1`，不会让 AI 自由生成检查规则。
 
 ### DELETE /api/categories/{id}
 
@@ -213,7 +232,19 @@ title, category_id, owner_id, description, changelog, file
 
 ### GET /api/documents/{id}
 
-返回文档详情和当前版本信息。
+返回文档详情、当前版本和 `review_state` 预审工作流摘要。`review_state.code`
+取值如下：
+
+- `unreviewed`：当前版本未预审；
+- `reviewing`：预审排队或执行中；
+- `awaiting_confirmation`：AI 预审完成，等待负责人确认；
+- `changes_required`：负责人已退回，需要修改后重新提交；
+- `resubmitted`：新版本已提交，等待以上次退回问题为基准复审；
+- `approved`：当前版本已由负责人确认通过；
+- `review_unavailable` / `review_failed`：预审未执行或执行失败。
+
+`review_state` 还包含 `version_id`、`review_id`、`note`、`error` 和
+`previous_review_id`，前端据此显示明确待办。
 
 ### PATCH /api/documents/{id}
 
@@ -233,7 +264,9 @@ title, category_id, owner_id, description, changelog, file
 
 ### GET /api/documents/{id}/versions
 
-返回该文档全部版本，按版本号倒序。
+返回该文档全部版本，按版本号倒序。每个版本带 `review` 摘要；
+负责人确认通过后，`review.human_decision` 为 `pass`，版本历史会显示
+“已通过负责人确认”。退回版本则为 `return`。
 
 ### POST /api/documents/{id}/versions
 
@@ -829,7 +862,25 @@ Base URL 仍是 `/api`，问答接口统一挂在 `/api/qa` 前缀下。所有�
 
 `spec_document_ids` 可选，最多 3 份，取各规范的当前版本；不传时使用该文档所属分类的 `default_spec_document_ids`，分类也没配置时只做内部一致性与版本变化检查。
 
-成功返回 201 和预审记录。`status` 为 pending / running / done / failed / skipped，`source` 为 manual / auto；`result` 含 `verdict`（pass / risk / unknown）、`summary`、`issues`、`spec_checks`、`changes`。
+成功返回 201 和预审记录。`status` 为 pending / running / done / failed / skipped，
+`source` 为 manual / auto。预审记录带版本化模板信息和 `checklist` 快照。
+
+`result.check_results` 按清单逐项给出 `pass`、`fail` 或 `unknown`，并附带
+`location`、`evidence`、`explanation`、`suggestion`。后端校验模型返回的规则 ID，
+缺失项自动补为 `unknown`，再根据必检项计算整体结论：
+
+- 任一项 `fail`：`risk`；
+- 没有失败但存在必检项 `unknown`：`unknown`；
+- 其余情况：`pass`。
+
+`result.checklist_summary` 返回总数、通过、不通过和待确认数量。旧格式模型只返回
+`issues` 时仍按兼容模式显示，但不会假装已完成逐项检查。
+
+每个 `issues` 项包含 `location` 与 `evidence`，用于说明问题位置和判断依据。
+如果同一文档的上一版本曾被人工退回，新预审会自动写入
+`previous_review_id`，并把上次问题带入提示词；`previous_issue_checks`
+逐项返回 `resolved` / `unresolved` / `unclear`。`previous_review` 摘要同时
+返回上次退回意见，供修订版复审页面展示。
 
 ### GET /api/documents/{id}/ai/reviews?limit=10
 

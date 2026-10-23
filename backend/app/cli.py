@@ -8,7 +8,7 @@ from flask import current_app
 from werkzeug.datastructures import FileStorage
 from werkzeug.security import generate_password_hash
 
-from . import db
+from . import db, review_templates
 from .models import (
     Document,
     DocumentCategory,
@@ -30,34 +30,69 @@ DEMO_CATEGORIES = [
     "其他",
 ]
 
-# 三篇演示文档覆盖三种状态，测试时不用自己造数据就能看到状态徽标
+DEMO_SCENARIO_DIR = (
+    Path(__file__).resolve().parent.parent
+    / "demo_data"
+    / "ai_review_scenario"
+)
+
+# 场景围绕数据库课程大纲审核展开，参考文献是分类的默认审核规范。
+# 整改稿 v2 只作为上传素材，不加入初始数据，确保可以现场走完整闭环。
 DEMO_DOCUMENTS = [
     {
-        "title": "2026级计算机科学与技术专业培养计划",
+        "title": "2026级数据科学与大数据技术专业培养方案",
+        "category": "专业培养计划",
+        "owner": "teacher",
+        "status": "archived",
+        "stored_name": "scenario_program_plan_v1.docx",
+        "filename": "2026级数据科学与大数据技术专业培养方案.docx",
+        "source_file": "01_2026级数据科学与大数据技术专业培养方案.docx",
+        "description": "数据库课程大纲的上位培养依据，规定培养目标、毕业要求与学分结构。",
+        "changelog": "2026 级培养方案初始版本",
+    },
+    {
+        "title": "数据科学与大数据技术专业毕业要求指标点（2026版）",
         "category": "专业培养计划",
         "owner": "teacher",
         "status": "active",
-        "stored_name": "sample_program_v1.txt",
-        "filename": "2026级培养计划_v1.txt",
-        "content": "示例文档：这是文档管理模块的样例内容。",
+        "stored_name": "scenario_indicator_map_v1.docx",
+        "filename": "数据科学与大数据技术专业毕业要求指标点_2026版.docx",
+        "source_file": "02_数据科学与大数据技术专业毕业要求指标点_2026版.docx",
+        "description": "课程目标与毕业要求指标点映射的审核依据。",
+        "changelog": "发布 2026 版毕业要求指标点",
     },
     {
-        "title": "2026版计算机科学与技术专业教学大纲",
+        "title": "数据库原理及应用课程教学大纲编写规范（2026版）",
+        "category": "教学大纲",
+        "owner": "admin",
+        "status": "active",
+        "stored_name": "scenario_syllabus_spec_v1.docx",
+        "filename": "数据库原理及应用课程教学大纲编写规范_2026版.docx",
+        "source_file": "03_数据库原理及应用课程教学大纲编写规范_2026版.docx",
+        "description": "规定大纲必填章节、学时计算、目标映射和考核比例。",
+        "changelog": "发布 2026 版编写规范",
+    },
+    {
+        "title": "数据库原理及应用课程教学大纲（待审核）",
         "category": "教学大纲",
         "owner": "teacher",
-        "status": "archived",
-        "stored_name": "sample_syllabus_v1.txt",
-        "filename": "2026版教学大纲_v1.txt",
-        "content": "示例文档：这是教学大纲的样例内容。",
+        "status": "active",
+        "stored_name": "scenario_syllabus_v1.docx",
+        "filename": "数据库原理及应用课程教学大纲_待审核_v1.docx",
+        "source_file": "04_数据库原理及应用课程教学大纲_待审核_v1.docx",
+        "description": "首次提交审核的课程大纲，包含学时、考核比例和团队目标考核缺口。",
+        "changelog": "首次提交审核",
     },
     {
-        "title": "2025-2026学年课程考核分析报告",
+        "title": "2025-2026学年第二学期数据库原理及应用课程考核分析报告",
         "category": "考核分析报告",
         "owner": "admin",
         "status": "deprecated",
-        "stored_name": "sample_report_v1.txt",
-        "filename": "考核分析报告_v1.txt",
-        "content": "示例文档：这是考核分析报告的样例内容。",
+        "stored_name": "scenario_assessment_report_v1.docx",
+        "filename": "数据库原理及应用课程考核分析报告.docx",
+        "source_file": "06_数据库原理及应用课程考核分析报告.docx",
+        "description": "上一轮课程考核与目标达成情况归档，供新一轮大纲修订参考。",
+        "changelog": "上一轮课程考核分析归档",
     },
 ]
 
@@ -85,7 +120,7 @@ DEMO_QA_TOPICS = [
         "title": "课程考核分析报告的提交时间是否调整",
         "description": "讨论本学年课程考核分析报告的提交截止时间是否需要提前。",
         "category": "课程考核",
-        "document": "2025-2026学年课程考核分析报告",
+        "document": "2025-2026学年第二学期数据库原理及应用课程考核分析报告",
         "creator": "teacher",
         "status": "open",
         "statements": [
@@ -132,7 +167,7 @@ def _save_demo_file(app, stored_name, content):
     下载就会 500 —— 演示数据必须和真实上传走同一条存储路径。
     """
     app.extensions["storage"].save(
-        FileStorage(stream=BytesIO(content.encode("utf-8")), filename=stored_name),
+        FileStorage(stream=BytesIO(content), filename=stored_name),
         stored_name,
     )
 
@@ -158,6 +193,10 @@ def seed_demo_data(app):
         if category is None:
             category = DocumentCategory(name=name, sort_order=order)
             db.session.add(category)
+        category.review_template_key = (
+            "syllabus_v1" if name == "教学大纲"
+            else review_templates.GENERIC_TEMPLATE_KEY
+        )
         categories[name] = category
 
     qa_categories = {}
@@ -181,21 +220,37 @@ def seed_demo_data(app):
                 owner=owner,
                 status=spec["status"],
             )
+            document.description = spec["description"]
             db.session.add(document)
             db.session.flush()
 
-            _save_demo_file(app, spec["stored_name"], spec["content"])
+            content = (DEMO_SCENARIO_DIR / spec["source_file"]).read_bytes()
+            _save_demo_file(app, spec["stored_name"], content)
             db.session.add(
                 DocumentVersion(
                     document=document,
                     version_number=1,
                     filename=spec["filename"],
                     file_path=spec["stored_name"],
-                    changelog="初始版本",
+                    changelog=spec["changelog"],
                     uploader=owner,
                 )
             )
+        else:
+            document.description = spec["description"]
         demo_documents[spec["title"]] = document
+
+    syllabus_category = categories["教学大纲"]
+    spec_document = demo_documents[
+        "数据库原理及应用课程教学大纲编写规范（2026版）"
+    ]
+    indicator_document = demo_documents[
+        "数据科学与大数据技术专业毕业要求指标点（2026版）"
+    ]
+    syllabus_category.default_spec_document_ids = [
+        indicator_document.id,
+        spec_document.id,
+    ]
 
     for spec in DEMO_QA_TOPICS:
         topic = QaTopic.query.filter_by(title=spec["title"]).first()
@@ -270,7 +325,8 @@ def register_commands(app):
         seed_demo_data(app)
         print("Seed completed.")
         print("Accounts: admin/admin123, teacher/teacher123, viewer/viewer123")
-        print("Documents: 3 (active / archived / deprecated)")
+        print("Documents: 5 scenario documents (program, indicators, spec, draft, report)")
+        print("AI review: draft starts unreviewed; revised v2 is ready for upload")
         print("Q&A topics: 2 (one consensus reached, one under discussion)")
         print("Tables: 1 (graduation project progress)")
 
@@ -315,10 +371,11 @@ def register_commands(app):
         if str(app.config.get("STORAGE_BACKEND") or "local").lower() == "cos":
             print(
                 "Note: files already stored in COS are not deleted; "
-                "the three sample objects are overwritten."
+                "the five scenario objects are overwritten."
             )
         print("Accounts: admin/admin123, teacher/teacher123, viewer/viewer123")
-        print("Documents: 3 (active / archived / deprecated)")
+        print("Documents: 5 database-course review scenario documents")
+        print("AI review: draft intentionally starts unreviewed")
         print("Q&A topics: 2 (one consensus reached, one under discussion)")
         print("Tables: 1 (graduation project progress)")
 

@@ -6,7 +6,7 @@ from pathlib import Path
 from flask import Blueprint, current_app, request, send_file
 from flask_login import current_user, login_required
 
-from . import ai, ai_review, db
+from . import ai, ai_review, db, review_templates
 from .extract import ExtractError
 from .models import (
     Document,
@@ -92,6 +92,15 @@ def list_categories():
     return api_success([category.to_dict() for category in categories])
 
 
+@bp.get("/review-templates")
+@login_required
+def list_review_templates():
+    if not current_user.is_admin:
+        return api_error("没有权限执行此操作", "permission_denied", 403)
+
+    return api_success(review_templates.list_templates())
+
+
 @bp.post("/categories")
 @login_required
 def create_category():
@@ -119,10 +128,20 @@ def create_category():
     except ai_review.ReviewError as exc:
         return api_error(str(exc), "invalid_spec", exc.status)
 
+    try:
+        template_key = ai_review.normalize_category_template_key(
+            payload.get(
+                "review_template_key", "generic_document_v1"
+            )
+        )
+    except ai_review.ReviewError as exc:
+        return api_error(str(exc), "invalid_template", exc.status)
+
     category = DocumentCategory(
         name=name,
         sort_order=sort_order,
         default_spec_document_ids=default_spec_ids,
+        review_template_key=template_key,
     )
     db.session.add(category)
     db.session.commit()
@@ -169,6 +188,16 @@ def update_category(category_id):
             )
         except ai_review.ReviewError as exc:
             return api_error(str(exc), "invalid_spec", exc.status)
+
+    if "review_template_key" in payload:
+        try:
+            category.review_template_key = (
+                ai_review.normalize_category_template_key(
+                    payload.get("review_template_key")
+                )
+            )
+        except ai_review.ReviewError as exc:
+            return api_error(str(exc), "invalid_template", exc.status)
 
     db.session.commit()
     return api_success(category.to_dict())
