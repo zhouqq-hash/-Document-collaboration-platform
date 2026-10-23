@@ -26,6 +26,7 @@ def app():
         "SQLALCHEMY_DATABASE_URI": f"sqlite:///{temp_dir / 'test.db'}",
         "SQLALCHEMY_TRACK_MODIFICATIONS": False,
         "UPLOAD_FOLDER": str(media_dir),
+        "BACKUP_FOLDER": str(temp_dir / "backups"),
         "MAX_CONTENT_LENGTH": 50 * 1024 * 1024,
         "ALLOWED_EXTENSIONS": {
             "pdf",
@@ -87,6 +88,7 @@ def build_test_config(temp_dir, **overrides):
         "SQLALCHEMY_DATABASE_URI": f"sqlite:///{temp_dir / 'test.db'}",
         "SQLALCHEMY_TRACK_MODIFICATIONS": False,
         "UPLOAD_FOLDER": str(temp_dir / "media"),
+        "BACKUP_FOLDER": str(temp_dir / "backups"),
         "MAX_CONTENT_LENGTH": 50 * 1024 * 1024,
         "ALLOWED_EXTENSIONS": {
             "pdf",

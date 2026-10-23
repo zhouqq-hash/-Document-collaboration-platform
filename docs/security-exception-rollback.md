@@ -6,7 +6,7 @@
 ## 0. 怎么读
 
 - 第 1 节：安全问题（现状 + 风险清单）。
-- 第 2 节：异常处理（统一错误格式、错误码、外部依赖降级、现有缺口）。
+- 第 2 节：异常处理（统一错误格式、错误码、外部依赖降级、追踪与就绪检查）。
 - 第 3 节：回滚方案（数据库迁移、文档、表格、部署、数据备份）。
 - 第 4 节：上线检查单（把三块合并成一条可打勾的清单，P5 按这条收口）。
 
@@ -31,8 +31,8 @@
   PythonAnywhere 需在 `deploy/pythonanywhere_wsgi.py` 里手填随机串。
 - 演示账号 `admin/admin123`、`teacher/teacher123`、`viewer/viewer123` 是公开弱口令，只用于演示；
   上线前必须删除或改强密码，且不要在生产跑 `flask seed`。
-- 显式设置 session cookie 安全属性：`SESSION_COOKIE_HTTPONLY=True`、`SESSION_COOKIE_SAMESITE="Lax"`，
-  HTTPS 下再加 `SESSION_COOKIE_SECURE=True`。
+- Session Cookie 已显式设置 HttpOnly / SameSite=Lax；生产配置默认启用 Secure，
+  `doctor --strict` 会阻止公网环境关闭 Secure。
 
 ### 1.2 授权（权限矩阵）
 
@@ -95,7 +95,7 @@
 | # | 风险 | 当前状态 | 上线前动作 |
 | --- | --- | --- | --- |
 | S1 | 开发默认 `SECRET_KEY` 外泄会导致会话伪造 | 有默认值兜底 | 生产用环境变量覆盖，检查是否已覆盖 |
-| S2 | 演示弱口令账号 | 三个公开账号 | 删除或改强密码，不在生产 seed |
+| S2 | 演示弱口令账号 | 仅演示 seed 创建；生产不再执行 seed | `doctor --strict` 阻止公网弱口令 |
 | S3 | 上传文件只查扩展名 | 已做白名单 + 50 MB + 路径校验 | 加 MIME / 魔数 / 病毒扫描（可选） |
 | S4 | 前端 XSS 转义是否全覆盖 | 大部分走 `escapeHtml`，未做全量审计 | W9 全量审查 innerHTML 点 |
 | S5 | session cookie 安全属性未显式设置 | 默认值 | 显式设置 HttpOnly / SameSite / Secure |
@@ -148,16 +148,15 @@
 - 存储：切 COS 时若缺 `COS_SECRET_ID / COS_SECRET_KEY / COS_REGION / COS_BUCKET` 任一项，
   启动即抛 `StorageError`（fail fast），不让半配置状态跑起来。
 
-### 2.4 现有缺口（上线前要补）
+### 2.4 已补齐的异常底座
 
-1. 没有全局 404 / 500 的 JSON 处理器。未匹配路由或未捕获异常会返回 Flask 默认 HTML 页，
-   前端读不到 `error` 结构。建议在 `__init__.py` 补 `@app.errorhandler(404)` 和 `@app.errorhandler(500)`，
-   对 `/api/` 前缀统一返回 JSON。
-2. 多数接口的 `db.session.commit()` 没有 try/except。唯一约束冲突（并发上传同一版本号、重名）会抛
-   `IntegrityError` 变成 500。建议封装一个「提交失败自动回滚」的辅助函数，或加全局 IntegrityError 处理。
-3. 微信 `login_or_create_user` 里的 `db.session.commit()` 失败时没有回滚分支，建议补上。
-4. 日志目前只有微信登录事件有结构化记录（`wechat-log.txt`），其余模块靠 Flask 默认日志。
-   生产建议统一访问日志 + 错误日志，并接 Sentry 之类的异常采集。
+1. `/api/` 下已有全局 404 / 405 / 500 JSON 处理器，未匹配接口同样返回统一 `error` 结构。
+2. `IntegrityError` 和数据库异常会先回滚事务；数据冲突返回 409，数据库不可用返回 503。
+3. 每个请求分配 `X-Request-ID`，错误响应体带同一个 `request_id`，服务日志可按追踪号搜索。
+4. `/api/ready` 分别探测数据库和文件存储；失败返回 503，平台不会提前接流量。
+5. 生产启动执行 `flask doctor --strict`，密钥、持久化、管理员和模拟登录等阻塞项不过则不启动。
+
+可选增强：接入 Sentry 等异常采集平台，并在前端增加主动反馈按钮。
 
 ### 2.5 前端对错误的表现
 
@@ -222,10 +221,11 @@
 
 ### 3.5 部署回滚
 
-Render（免费）：
+Render（生产持久盘）：
 
-- 控制台 Deploy 历史里有 Instant Rollback，可一键回到上一个成功部署；
-  免费版每次重新部署都会重置 SQLite / media，回滚主要是回代码。
+- 控制台 Deploy 历史里有 Instant Rollback，可回到上一个成功部署；
+- `/var/data` 挂载盘在正常重启和重新部署之间保留数据库、文件和备份；
+- 回滚代码前仍应先执行 `flask backup`，迁移是否回退按兼容性决定。
 
 PythonAnywhere（免费）：
 
@@ -250,7 +250,8 @@ PythonAnywhere（免费）：
 
 - 数据库和 `file_path` 必须一致：恢复 DB 的同时要恢复对应 media 文件 / COS 对象，否则下载会 404 / 500。
 - `flask demo-reset` 是演示复位（清库重灌），**不能用于生产数据恢复**。
-- 建议 P5 加一条 `flask backup` CLI：把 DB 和 media 打包成带时间戳的 zip，恢复时一条命令解回。
+- 已提供 `flask backup`：SQLite 使用在线一致性备份，本地文件一并写入带 manifest 的 ZIP；
+  恢复使用 `flask restore <zip> --yes`，并自动生成恢复前快照。
 
 ### 3.7 回滚决策表
 
@@ -270,15 +271,15 @@ PythonAnywhere（免费）：
 
 - [ ] `SECRET_KEY` 已用环境变量覆盖开发默认值。
 - [ ] 演示弱口令账号已删除或改强密码，生产不执行 `flask seed`。
-- [ ] session cookie 显式设置 HttpOnly / SameSite（HTTPS 下加 Secure）。
+- [x] session cookie 显式设置 HttpOnly / SameSite（HTTPS 下加 Secure）。
 - [ ] W9 完成前端 `innerHTML` 全量 XSS 审查（用户可控字段全部转义）。
 - [ ] 密钥类环境变量不入库、不进前端。
 
 异常处理：
 
-- [ ] 补全局 404 / 500 JSON 处理器（`/api/` 前缀）。
-- [ ] 统一封装 `db.session.commit()` 的失败回滚，或加全局 IntegrityError 处理。
-- [ ] 微信 / AI / 存储三个外部依赖的降级路径有测试或人工验证。
+- [x] 补全局 404 / 500 JSON 处理器（`/api/` 前缀）。
+- [x] 统一封装 `db.session.commit()` 的失败回滚，或加全局 IntegrityError 处理。
+- [x] 微信 / AI / 存储三个外部依赖的降级路径有测试或人工验证。
 
 回滚：
 

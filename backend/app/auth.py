@@ -1,4 +1,4 @@
-from flask import Blueprint, request
+from flask import Blueprint, current_app, request
 from flask_login import current_user, login_required, login_user, logout_user
 
 from .models import User
@@ -6,6 +6,18 @@ from .utils import api_error, api_success
 
 #创建蓝图
 bp = Blueprint("auth", __name__, url_prefix="/api/auth")
+
+@bp.get("/config")
+def config():
+    """Expose only non-secret login UI switches."""
+    demo_credentials = []
+    if current_app.config.get("SHOW_DEMO_CREDENTIALS"):
+        demo_credentials = [
+            {"username": "admin", "password": "admin123", "role": "管理员"},
+            {"username": "teacher", "password": "teacher123", "role": "负责人"},
+            {"username": "viewer", "password": "viewer123", "role": "普通教师"},
+        ]
+    return api_success({"demo_credentials": demo_credentials})
 
 #登录接口
 @bp.post("/login")

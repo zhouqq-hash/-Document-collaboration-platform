@@ -5,6 +5,30 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
+def _database_uri():
+    """Return a SQLAlchemy URI that works with SQLite and Render Postgres."""
+    value = (os.environ.get("DATABASE_URL") or "").strip()
+    if not value:
+        return "sqlite:///" + str(
+            BASE_DIR / "instance" / "doc_collab.db"
+        ).replace("\\", "/")
+
+    # Render still issues the legacy ``postgres://`` prefix.  Production
+    # installs psycopg 3, so make the driver explicit.
+    if value.startswith("postgres://"):
+        value = "postgresql://" + value[len("postgres://") :]
+    if value.startswith("postgresql://"):
+        value = "postgresql+psycopg://" + value[len("postgresql://") :]
+    return value
+
+
+def _engine_options(uri):
+    options = {"pool_pre_ping": True}
+    if uri.startswith("sqlite:"):
+        options["connect_args"] = {"timeout": env_int("SQLITE_TIMEOUT", 30)}
+    return options
+
+
 def _load_dotenv():
     """从 backend/.env 读取本地密钥（该文件已被 .gitignore 忽略，不会提交）。"""
     env_file = BASE_DIR / ".env"
@@ -40,14 +64,38 @@ def env_bool(name, default):
 
 
 class Config:
+    APP_ENV = os.environ.get("APP_ENV", "development").strip().lower()
+    PUBLIC_DEPLOYMENT = env_bool("PUBLIC_DEPLOYMENT", False)
+    SHOW_DEMO_CREDENTIALS = env_bool(
+        "SHOW_DEMO_CREDENTIALS",
+        APP_ENV != "production" and not PUBLIC_DEPLOYMENT,
+    )
     # 生产环境（Render 等）用环境变量覆盖；没设时保留开发用的默认值
     SECRET_KEY = os.environ.get("SECRET_KEY", "dev-secret-change-me")
-    SQLALCHEMY_DATABASE_URI = "sqlite:///" + str(
-        BASE_DIR / "instance" / "doc_collab.db"
-    ).replace("\\", "/")
+    SQLALCHEMY_DATABASE_URI = _database_uri()
     SQLALCHEMY_TRACK_MODIFICATIONS = False
-    UPLOAD_FOLDER = BASE_DIR / "media"
-    MAX_CONTENT_LENGTH = 50 * 1024 * 1024
+    SQLALCHEMY_ENGINE_OPTIONS = _engine_options(
+        os.environ.get("DATABASE_URL") or "sqlite"
+    )
+    UPLOAD_FOLDER = Path(
+        os.environ.get("UPLOAD_FOLDER", str(BASE_DIR / "media"))
+    ).expanduser()
+    BACKUP_FOLDER = Path(
+        os.environ.get("BACKUP_FOLDER", str(BASE_DIR / "backups"))
+    ).expanduser()
+    MAX_CONTENT_LENGTH = env_int("MAX_CONTENT_LENGTH", 50 * 1024 * 1024)
+    SESSION_COOKIE_HTTPONLY = True
+    SESSION_COOKIE_SAMESITE = os.environ.get(
+        "SESSION_COOKIE_SAMESITE", "Lax"
+    )
+    SESSION_COOKIE_SECURE = env_bool(
+        "SESSION_COOKIE_SECURE", APP_ENV == "production"
+    )
+    PERMANENT_SESSION_LIFETIME = env_int("SESSION_LIFETIME_SECONDS", 12 * 3600)
+    PREFERRED_URL_SCHEME = "https" if APP_ENV == "production" else "http"
+    LOG_LEVEL = os.environ.get(
+        "LOG_LEVEL", "INFO" if APP_ENV == "production" else "DEBUG"
+    ).upper()
     STORAGE_BACKEND = os.environ.get("STORAGE_BACKEND", "local")
     COS_SECRET_ID = os.environ.get("COS_SECRET_ID")
     COS_SECRET_KEY = os.environ.get("COS_SECRET_KEY")

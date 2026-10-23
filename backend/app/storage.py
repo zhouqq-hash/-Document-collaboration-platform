@@ -6,6 +6,7 @@
 """
 import os
 import shutil
+import tempfile
 from pathlib import Path
 
 
@@ -43,6 +44,20 @@ class LocalStorage:
 
     def delete(self, key):
         self._resolve(key).unlink(missing_ok=True)
+
+    def probe(self):
+        """Verify that the upload volume is writable and readable."""
+        self.root.mkdir(parents=True, exist_ok=True)
+        with tempfile.NamedTemporaryFile(
+            mode="wb", dir=self.root, prefix=".readiness-", delete=False
+        ) as handle:
+            path = Path(handle.name)
+            handle.write(b"ok")
+        try:
+            if path.read_bytes() != b"ok":
+                raise StorageError("上传目录可写但读取结果不一致")
+        finally:
+            path.unlink(missing_ok=True)
 
 
 class CosStorage:
@@ -88,6 +103,10 @@ class CosStorage:
 
     def delete(self, key):
         self.client.delete_object(Bucket=self.bucket, Key=key)
+
+    def probe(self):
+        """Check bucket credentials without changing object data."""
+        self.client.head_bucket(Bucket=self.bucket)
 
 
 def get_storage(app):

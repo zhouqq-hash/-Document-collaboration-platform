@@ -4,18 +4,41 @@ services:
   - type: web
     name: doc-collab
     runtime: python
-    plan: free
+    # 公网正式使用必须用持久盘；free 实例重启会清空 SQLite 和上传文件。
+    plan: starter
     branch: main
     autoDeploy: true
     buildCommand: pip install -r backend/requirements-render.txt
     startCommand: bash scripts/render-start.sh
-    healthCheckPath: /api/health
+    healthCheckPath: /api/ready
+    disk:
+      name: doc-collab-data
+      mountPath: /var/data
+      sizeGB: 5
     envVars:
       - key: PYTHON_VERSION
         value: "3.11.9"
-      # Render 生成一个随机密钥，覆盖 config.py 里开发用的默认值
+      - key: APP_ENV
+        value: production
+      - key: PUBLIC_DEPLOYMENT
+        value: "1"
       - key: SECRET_KEY
         generateValue: true
-      # 微信登录走演示模式（免费平台没有备案域名，真机联调走不通）
-      - key: WECHAT_MOCK_ENABLED
+      - key: DATABASE_URL
+        value: sqlite:////var/data/doc_collab.db
+      - key: UPLOAD_FOLDER
+        value: /var/data/media
+      - key: BACKUP_FOLDER
+        value: /var/data/backups
+      - key: SESSION_COOKIE_SECURE
         value: "1"
+      # 公网环境绝不能开启模拟微信登录。
+      - key: WECHAT_MOCK_ENABLED
+        value: "0"
+      - key: SHOW_DEMO_CREDENTIALS
+        value: "0"
+      - key: BOOTSTRAP_ADMIN_USERNAME
+        value: admin
+      # 首次创建管理员时在 Render 控制台手动填写，至少 12 位。
+      - key: BOOTSTRAP_ADMIN_PASSWORD
+        sync: false

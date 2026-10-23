@@ -208,10 +208,10 @@ function reviewWorkflowDescription(doc, state) {
     return `${version} 已通过负责人确认${reviewer ? `（${reviewer}）` : ""}。`;
   }
   if (state.code === "review_unavailable") {
-    return `${version} 尚未完成预审，请检查 AI 配置后重新发起。`;
+    return `${version} 尚未完成预审，可重试 AI，或由负责人完成人工兜底。`;
   }
   if (state.code === "review_failed") {
-    return `${version} 的预审执行失败，请查看失败原因后重试。`;
+    return `${version} 的预审执行失败，可查看原因后重试或人工兜底。`;
   }
   return `${version} 还没有预审记录。负责人可以先选择规范并开始预审。`;
 }
@@ -239,7 +239,7 @@ function reviewWorkflowBannerHtml(doc, state, canManage) {
     canManage
   ) {
     actions = `
-      <a class="btn btn-primary btn-sm" href="#reviewSection">检查并重新预审</a>
+      <a class="btn btn-primary btn-sm" href="#reviewSection">重试或人工兜底</a>
       ${resultsLink}
     `;
   } else if (state.code === "approved") {
@@ -494,10 +494,17 @@ async function apiRequest(path, options = {}, { redirectOn401 = true } = {}) {
   }
 
   if (!response.ok) {
+    const requestId =
+      payload?.error?.request_id || response.headers.get("X-Request-ID") || "";
+    const baseMessage =
+      payload?.error?.message || `请求失败（${response.status}）`;
     const error = new Error(
-      payload?.error?.message || `请求失败（${response.status}）`
+      response.status >= 500 && requestId
+        ? `${baseMessage}（追踪号：${requestId}）`
+        : baseMessage
     );
     error.status = response.status;
+    error.requestId = requestId;
     throw error;
   }
 
@@ -807,6 +814,31 @@ async function initLogin() {
   }
 
   const form = document.getElementById("loginForm");
+  try {
+    const config = await apiRequest(
+      "/api/auth/config",
+      {},
+      { redirectOn401: false }
+    );
+    const demoCredentials = config.demo_credentials || [];
+    const hint = document.getElementById("demoCredentials");
+    if (demoCredentials.length) {
+      hint.innerHTML = `演示账号：${demoCredentials
+        .map(
+          (item) =>
+            `${escapeHtml(item.username)} / ${escapeHtml(item.password)}（${escapeHtml(item.role)}）`
+        )
+        .join("，")}`;
+      hint.hidden = false;
+      document.getElementById("username").value =
+        demoCredentials[0].username;
+      document.getElementById("password").value =
+        demoCredentials[0].password;
+    }
+  } catch (_) {
+    // Login remains usable even if the optional UI hint cannot load.
+  }
+
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
     const username = document.getElementById("username").value.trim();
@@ -1582,6 +1614,7 @@ async function initDocumentAiPanels(doc, canReview) {
     const summary = review.result?.checklist_summary || {};
     const attentionCount =
       Number(summary.fail || 0) + Number(summary.unknown || 0);
+    const isManualFallback = Boolean(review.manual_fallback_available);
 
     return new Promise((resolve) => {
       const returnFocusTo = document.activeElement;
@@ -1589,18 +1622,25 @@ async function initDocumentAiPanels(doc, canReview) {
       modal.className = "confirm-modal";
       modal.innerHTML = `
         <section class="confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="humanPassTitle" aria-describedby="humanPassDescription">
-          <div class="confirm-dialog-kicker">人工确认</div>
-          <h2 id="humanPassTitle">确认通过这份文档？</h2>
+          <div class="confirm-dialog-kicker">${isManualFallback ? "人工兜底确认" : "人工确认"}</div>
+          <h2 id="humanPassTitle">${isManualFallback ? "确认已完成人工核验？" : "确认通过这份文档？"}</h2>
           <p id="humanPassDescription">
-            通过后，当前版本将标记为“已通过”，并记录确认账号、时间和备注。
-            请先核对检查清单、原文依据和需要处理的事项。
+            ${
+              isManualFallback
+                ? "本次 AI 预审未完成。通过后将记录为人工兜底确认，并保留 AI 失败原因、确认账号和时间。"
+                : "通过后，当前版本将标记为“已通过”，并记录确认账号、时间和备注。请先核对检查清单、原文依据和需要处理的事项。"
+            }
           </p>
           <div class="confirm-dialog-verdict ${verdictClass(verdict)}">
-            <span>AI 预审结论</span>
-            <strong>${escapeHtml(verdictLabel(verdict))}</strong>
+            <span>${isManualFallback ? "AI 预审状态" : "AI 预审结论"}</span>
+            <strong>${escapeHtml(
+              isManualFallback ? reviewStatusLabel(review) : verdictLabel(verdict)
+            )}</strong>
           </div>
           ${
-            attentionCount
+            isManualFallback
+              ? '<p class="confirm-dialog-warning">人工兜底不会修改或伪造 AI 结果，失败原因会保留在预审记录与日志中。</p>'
+              : attentionCount
               ? `<p class="confirm-dialog-warning">当前仍有 ${attentionCount} 项不通过或待确认，请确认已完成人工核验。</p>`
               : ""
           }
@@ -1646,6 +1686,121 @@ async function initDocumentAiPanels(doc, canReview) {
     });
   }
 
+  function humanDecisionPanel(review, { fallback = false } = {}) {
+    if (!canReview) {
+      return `<p class="muted">${humanDecisionLabel(review)}</p>`;
+    }
+    return `
+      <div class="field-label">${fallback ? "人工兜底" : "人工确认"}</div>
+      <p class="muted">
+        ${
+          fallback
+            ? "AI 不可用时可由负责人完成人工核验；请留下检查依据，系统会保留失败原因。"
+            : "AI 结论仅供参考，最终由负责人确认。"
+        }
+      </p>
+      <textarea id="humanReviewNote" rows="2" placeholder="${
+        fallback ? "请填写人工核验依据（通过时必填）" : "可填写确认说明或退回原因"
+      }">${escapeHtml(review.human_note || "")}</textarea>
+      <div class="actions">
+        <button class="btn btn-primary" type="button" data-human-decision="pass">${
+          fallback ? "人工核验后通过" : "通过"
+        }</button>
+        <button class="btn btn-warning" type="button" data-human-decision="return">退回修改</button>
+        <span class="review-human-state">${humanDecisionLabel(review)}</span>
+      </div>
+    `;
+  }
+
+  function bindHumanDecisionControls(review, root) {
+    if (!canReview) {
+      return;
+    }
+    root
+      .querySelectorAll("[data-human-decision]")
+      .forEach((button) => {
+        button.addEventListener("click", async () => {
+          const decision = button.dataset.humanDecision;
+          const note =
+            root.querySelector("#humanReviewNote")?.value.trim() || "";
+          const fallback = Boolean(review.manual_fallback_available);
+          if ((decision === "return" || fallback) && !note) {
+            alert(
+              decision === "return"
+                ? "退回修改时请填写原因"
+                : "人工兜底通过时请填写核验依据"
+            );
+            return;
+          }
+          if (
+            decision === "pass" &&
+            !(await promptHumanPassConfirmation(review))
+          ) {
+            return;
+          }
+
+          root
+            .querySelectorAll("[data-human-decision], [data-review-retry]")
+            .forEach((item) => {
+              item.disabled = true;
+            });
+
+          try {
+            const updated = await apiRequest(
+              `/api/documents/${doc.id}/ai/reviews/${review.id}/decision`,
+              {
+                method: "PATCH",
+                body: JSON.stringify({
+                  decision,
+                  note,
+                  manual_fallback: fallback,
+                }),
+              }
+            );
+            const index = loadedReviews.findIndex(
+              (item) => String(item.id) === String(updated.id)
+            );
+            if (index >= 0) {
+              loadedReviews[index] = updated;
+            }
+            renderReview(updated);
+            await loadReviewHistory();
+          } catch (error) {
+            alert(error.message);
+            root
+              .querySelectorAll("[data-human-decision], [data-review-retry]")
+              .forEach((item) => {
+                item.disabled = false;
+              });
+          }
+        });
+      });
+
+    const retryButton = root.querySelector("[data-review-retry]");
+    retryButton?.addEventListener("click", async () => {
+      retryButton.disabled = true;
+      retryButton.textContent = "重新尝试中…";
+      try {
+        const updated = await apiRequest(
+          `/api/documents/${doc.id}/ai/reviews/${review.id}/retry`,
+          { method: "POST", body: "{}" }
+        );
+        const index = loadedReviews.findIndex(
+          (item) => String(item.id) === String(updated.id)
+        );
+        if (index >= 0) {
+          loadedReviews[index] = updated;
+        }
+        renderReview(updated);
+        await loadReviewHistory();
+      } catch (error) {
+        alert(error.message);
+        retryButton.disabled = false;
+        retryButton.textContent = "重新尝试 AI 预审";
+      }
+    });
+  }
+
   function renderReview(review) {
     if ((review.status || "done") !== "done") {
       const status = review.status || "pending";
@@ -1663,7 +1818,24 @@ async function initDocumentAiPanels(doc, canReview) {
             v${review.version_number ?? "-"} · ${review.source === "auto" ? "自动预审" : "手动预审"} · ${formatTime(review.created_at)}
           </span>
         </div>
+        ${
+          review.manual_fallback_available
+            ? `
+              <div class="review-decision">
+                ${humanDecisionPanel(review, { fallback: true })}
+                ${
+                  canReview
+                    ? '<div class="actions"><button class="btn btn-outline" type="button" data-review-retry>重新尝试 AI 预审</button></div>'
+                    : ""
+                }
+              </div>
+            `
+            : ""
+        }
       `;
+      if (review.manual_fallback_available) {
+        bindHumanDecisionControls(review, resultBox);
+      }
       return;
     }
 
@@ -1863,75 +2035,11 @@ async function initDocumentAiPanels(doc, canReview) {
       <div class="review-block"><h3>版本变化</h3>${changeHtml}</div>
       ${previousChecksHtml}
       <div class="review-decision">
-        <div class="field-label">人工确认</div>
-        ${
-          canReview
-            ? `
-              <p class="muted">AI 结论仅供参考，最终由负责人确认。</p>
-              <textarea id="humanReviewNote" rows="2" placeholder="可填写确认说明或退回原因">${escapeHtml(review.human_note || "")}</textarea>
-              <div class="actions">
-                <button class="btn btn-primary" type="button" data-human-decision="pass">通过</button>
-                <button class="btn btn-warning" type="button" data-human-decision="return">退回修改</button>
-                <span class="review-human-state">${humanDecisionLabel(review)}</span>
-              </div>
-            `
-            : `<p class="muted">${humanDecisionLabel(review)}</p>`
-        }
+        ${humanDecisionPanel(review)}
       </div>
     `;
 
-    if (canReview) {
-      resultBox
-        .querySelectorAll("[data-human-decision]")
-        .forEach((button) => {
-          button.addEventListener("click", async () => {
-            const decision = button.dataset.humanDecision;
-            const note =
-              resultBox.querySelector("#humanReviewNote")?.value.trim() || "";
-            if (decision === "return" && !note) {
-              alert("退回修改时请填写原因");
-              return;
-            }
-            if (
-              decision === "pass" &&
-              !(await promptHumanPassConfirmation(review))
-            ) {
-              return;
-            }
-
-            resultBox
-              .querySelectorAll("[data-human-decision]")
-              .forEach((item) => {
-                item.disabled = true;
-              });
-
-            try {
-              const updated = await apiRequest(
-                `/api/documents/${doc.id}/ai/reviews/${review.id}/decision`,
-                {
-                  method: "PATCH",
-                  body: JSON.stringify({ decision, note }),
-                }
-              );
-              const index = loadedReviews.findIndex(
-                (item) => String(item.id) === String(updated.id)
-              );
-              if (index >= 0) {
-                loadedReviews[index] = updated;
-              }
-              renderReview(updated);
-              await loadReviewHistory();
-            } catch (error) {
-              alert(error.message);
-              resultBox
-                .querySelectorAll("[data-human-decision]")
-                .forEach((item) => {
-                  item.disabled = false;
-                });
-            }
-          });
-        });
-    }
+    bindHumanDecisionControls(review, resultBox);
   }
 
   let reviewRefreshTimer = null;
@@ -2023,6 +2131,7 @@ async function initDocumentAiPanels(doc, canReview) {
       await loadReviewHistory();
     } catch (error) {
       resultBox.innerHTML = `<div class="notice">${escapeHtml(error.message)}</div>`;
+      await loadReviewHistory();
     } finally {
       reviewButton.disabled = false;
       reviewButton.textContent = "开始预审";

@@ -123,3 +123,23 @@ def test_demo_reset_keep_media(app):
     with app.app_context():
         assert Document.query.count() == 5
         assert DocumentAiReview.query.count() == 0
+
+
+def test_create_user_prompts_for_password_without_putting_it_in_args(app):
+    runner = app.test_cli_runner()
+    result = runner.invoke(
+        args=[
+            "create-user",
+            "--username",
+            "teacher02",
+            "--name",
+            "李老师",
+        ],
+        input="strong-password-123\nstrong-password-123\n",
+    )
+
+    assert result.exit_code == 0, result.output
+    with app.app_context():
+        user = User.query.filter_by(username="teacher02").one()
+        assert user.role == "teacher"
+        assert user.check_password("strong-password-123")

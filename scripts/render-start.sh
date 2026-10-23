@@ -1,11 +1,19 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Render 每次部署都会新建容器，磁盘是临时的：
-# 先把数据库结构升级到最新，再补齐幂等的演示数据，
-# 保证站点一打开就有账号和示例内容（重跑不会重复造数据）。
+# 先升级结构，再回收上次进程退出时遗留的预审任务。
 python -m flask --app backend/run.py db upgrade
-python -m flask --app backend/run.py seed
+python -m flask --app backend/run.py recover-reviews --older-than 15
+
+# 公网环境只创建管理员，不灌演示弱口令或示例业务数据。
+if [ "${APP_ENV:-development}" = "production" ]; then
+  python -m flask --app backend/run.py bootstrap-admin
+else
+  python -m flask --app backend/run.py seed
+fi
+
+# 阻塞项（密钥、持久化、数据库、存储、管理员）不通过时停止接流量。
+python -m flask --app backend/run.py doctor --strict
 
 # --chdir backend：让 run:app 里的 `from app import create_app` 能找到包，
 #   等同于本地 `python backend/run.py` 时把 backend/ 放进 sys.path。
@@ -17,5 +25,7 @@ exec gunicorn \
   --workers 1 \
   --threads 4 \
   --timeout 300 \
+  --graceful-timeout 30 \
   --access-logfile - \
+  --error-logfile - \
   run:app

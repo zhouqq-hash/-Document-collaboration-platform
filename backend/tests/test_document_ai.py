@@ -1,9 +1,9 @@
 import io
 import json
 
-from app import ai, db
+from app import ai, ai_review, db
 from app.ai_review import apply_checklist_result, parse_review_result
-from app.models import DocumentAiReview
+from app.models import Document, DocumentAiReview, User
 from app.review_templates import get_template
 from conftest import create_document, login
 
@@ -48,6 +48,24 @@ def test_document_qa_without_key_returns_503(app, client, monkeypatch):
 
     assert response.status_code == 503
     assert response.get_json()["error"]["code"] == "ai_not_configured"
+
+
+def test_manual_review_without_key_leaves_manual_fallback_record(
+    app, client, monkeypatch
+):
+    monkeypatch.delenv("COSMOS_API_KEY", raising=False)
+    app.config["COSMOS_API_KEY"] = ""
+    create_document(client)
+
+    response = client.post("/api/documents/1/ai/review", json={})
+    assert response.status_code == 503
+    assert response.get_json()["error"]["code"] == "ai_not_configured"
+
+    reviews = client.get("/api/documents/1/ai/reviews").get_json()["data"]
+    assert len(reviews) == 1
+    assert reviews[0]["status"] == "skipped"
+    assert reviews[0]["manual_fallback_available"] is True
+    assert "人工兜底" in reviews[0]["error"]
 
 
 def test_document_qa_sends_document_text(app, client, monkeypatch):
@@ -581,3 +599,63 @@ def test_new_version_becomes_resubmission_and_review_links_previous(
     )
     assert "上次人工退回" in captured["prompt"]
     assert "总学时前后不一致" in captured["prompt"]
+
+
+def test_ai_unavailable_can_be_resolved_by_explicit_manual_fallback(
+    app, client, monkeypatch
+):
+    monkeypatch.delenv("COSMOS_API_KEY", raising=False)
+    app.config["COSMOS_API_KEY"] = ""
+    created = _create_document(
+        client, "AI 不可用流程", "需要人工审核".encode("utf-8")
+    )
+    document_id = created.get_json()["data"]["id"]
+
+    with app.app_context():
+        document = db.session.get(Document, document_id)
+        teacher = User.query.filter_by(username="teacher").one()
+        review = ai_review.create_review(
+            document,
+            document.current_version,
+            teacher,
+            source="auto",
+        )
+        review.status = "skipped"
+        review.error_message = "模型网络不可用"
+        db.session.commit()
+        review_id = review.id
+
+    endpoint = f"/api/documents/{document_id}/ai/reviews/{review_id}"
+    denied = client.patch(f"{endpoint}/decision", json={"decision": "pass"})
+    assert denied.status_code == 409
+    assert denied.get_json()["error"]["code"] == "manual_fallback_required"
+
+    missing_note = client.patch(
+        f"{endpoint}/decision",
+        json={
+            "decision": "pass",
+            "manual_fallback": True,
+            "note": "",
+        },
+    )
+    assert missing_note.status_code == 400
+    assert missing_note.get_json()["error"]["code"] == "note_required"
+
+    retry = client.post(f"{endpoint}/retry")
+    assert retry.status_code == 503
+    assert retry.get_json()["error"]["code"] == "ai_not_configured"
+
+    approved = client.patch(
+        f"{endpoint}/decision",
+        json={
+            "decision": "pass",
+            "manual_fallback": True,
+            "note": "已逐页对照学院模板人工核验",
+        },
+    )
+    assert approved.status_code == 200
+    assert approved.get_json()["data"]["human_decision"] == "pass"
+
+    detail = client.get(f"/api/documents/{document_id}").get_json()["data"]
+    assert detail["review_state"]["code"] == "approved"
+    assert detail["review_state"]["error"] == "模型网络不可用"

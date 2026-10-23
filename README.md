@@ -10,7 +10,7 @@
 | 表格协作 | 空白创建、Excel / CSV 导入、行内编辑、公式重算、修改记录与版本回滚 | 登录用户协作，创建者和管理员管理 |
 | 问答讨论 | 话题筛选、高密度讨论流、关联文档与版本、时间线发言、意见汇总和最终结论     | 登录用户参与，管理员处理治理事项 |
 
-当前后端测试结果：**227 passed**。
+当前后端测试结果：**239 passed**。
 
 ## 界面预览
 
@@ -149,6 +149,16 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned
 
 当前交付状态：**演示模式可用、真机联调暂停**（试过公众平台测试号 + 公网隧道，排错记录见 `docs/worklog-2026-09-27.md`）。配置项、命令手册、排错对照表和恢复联调的清单都在 `docs/wechat-login-guide.md`；原理和时序见 `docs/wechat-auth-flow.md`；一键起隧道用 `.\tools\wechat-tunnel.ps1`。
 
+## 公网部署与恢复
+
+公网正式使用必须挂载持久盘或连接 PostgreSQL，并同时持久化上传目录和备份目录；Render
+免费实例的临时磁盘只适合演示。仓库的 `render.yaml` 已配置 `starter` 实例和 `/var/data`
+持久盘，生产启动会执行数据库迁移、遗留预审回收、管理员初始化和 `doctor --strict`。
+
+部署步骤、环境变量、账号开通、备份恢复和故障处理见
+[`docs/deploy-render.md`](docs/deploy-render.md) 与
+[`docs/production-runbook.md`](docs/production-runbook.md)。
+
 ## 查看原型
 
 `http://127.0.0.1:5000/` 是原型入口页，展示三个已完成的业务模块：
@@ -235,7 +245,7 @@ Stop-Process -Id <占用端口的 PID>
 当前完整测试集：
 
 ```text
-227 passed
+239 passed
 ```
 
 ## 数据库迁移

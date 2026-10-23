@@ -18,7 +18,7 @@
 
 - Python 3.11+
 - Flask 3
-- SQLite（开发环境）
+- SQLite（开发 / 小规模单实例）；PostgreSQL（生产多实例推荐）
 
 ## 本地运行
 
@@ -57,11 +57,16 @@ python -m pytest tests -q
 
 ## 数据存储
 
-- SQLite 数据库：`instance/doc_collab.db`
-- 上传文件：`media/`
+- 数据库：默认 `instance/doc_collab.db`，生产通过 `DATABASE_URL` 指向 PostgreSQL 或持久盘 SQLite
+- 上传文件：默认 `media/`，生产通过 `UPLOAD_FOLDER` 指向持久盘或启用 COS
+- 备份：默认 `backups/`，生产通过 `BACKUP_FOLDER` 指向持久卷
 - 数据库结构：`db_migrations/`
 
 `instance/` 和 `media/` 下的运行数据默认不提交版本库。其他人拿到代码后执行 `db upgrade` 和 `seed` 即可生成自己的数据库和演示数据。
+
+生产环境不要执行 `seed` 或 `demo-reset`；使用 `bootstrap-admin` / `create-user` 建账号。
+启动前执行 `doctor --strict`，在线恢复用 `backup` / `restore`，中断预审用
+`recover-reviews` 清理。完整步骤见根目录 `docs/deploy-render.md`。
 
 ## 主要接口
 
@@ -70,6 +75,8 @@ python -m pytest tests -q
 | POST | `/api/auth/login` | 登录 |
 | POST | `/api/auth/logout` | 退出登录 |
 | GET | `/api/auth/me` | 当前用户 |
+| GET | `/api/health` | 进程存活检查 |
+| GET | `/api/ready` | 数据库和文件存储就绪检查 |
 | GET | `/api/auth/wechat/config` | 微信登录模式（live / mock / disabled） |
 | GET | `/api/auth/wechat/authorize-url` | 生成微信授权地址，`?bind=1` 表示绑定 |
 | GET | `/api/auth/wechat/callback` | 微信授权回调 |

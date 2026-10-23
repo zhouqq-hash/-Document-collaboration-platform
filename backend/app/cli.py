@@ -1,4 +1,6 @@
+import os
 import shutil
+from datetime import datetime, timedelta, timezone
 from io import BytesIO
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -11,6 +13,7 @@ from werkzeug.security import generate_password_hash
 from . import db, review_templates
 from .models import (
     Document,
+    DocumentAiReview,
     DocumentCategory,
     DocumentVersion,
     QaStatement,
@@ -524,3 +527,162 @@ def register_commands(app):
         print("  40164 invalid ip         → 公众号后台配了 IP 白名单，当前出口 IP 不在里面")
         print("  45009 api freq out of limit → 调用太频繁，等一会儿再试")
         raise SystemExit(1)
+
+    @app.cli.command("bootstrap-admin")
+    @click.option(
+        "--username",
+        default=lambda: os.environ.get("BOOTSTRAP_ADMIN_USERNAME", "admin"),
+        show_default=True,
+    )
+    @click.option("--name", default="系统管理员", show_default=True)
+    @click.option("--password", default=lambda: os.environ.get("BOOTSTRAP_ADMIN_PASSWORD"))
+    def bootstrap_admin(username, name, password):
+        """Create the first administrator without loading public demo data."""
+        username = (username or "").strip()
+        password = password or ""
+        if not username:
+            raise click.ClickException(
+                "需要 BOOTSTRAP_ADMIN_USERNAME"
+            )
+
+        existing = User.query.filter_by(username=username).first()
+        if existing is not None:
+            if existing.role != "admin":
+                raise click.ClickException(
+                    f"账号 {username} 已存在，但不是管理员"
+                )
+            print(f"管理员 {username} 已存在，未修改密码。")
+            return
+        if not password:
+            raise click.ClickException("首次创建需要 BOOTSTRAP_ADMIN_PASSWORD")
+        if len(password) < 12:
+            raise click.ClickException("管理员密码至少需要 12 个字符")
+
+        user = User(username=username, name=(name or "系统管理员").strip())
+        user.role = "admin"
+        user.set_password(password)
+        db.session.add(user)
+        db.session.commit()
+        print(f"已创建管理员 {username}。")
+
+    @app.cli.command("create-user")
+    @click.option("--username", required=True)
+    @click.option("--name", required=True)
+    @click.option(
+        "--password",
+        help="不填时安全交互输入，避免密码进入 Shell 历史。",
+    )
+    @click.option(
+        "--role",
+        type=click.Choice(["teacher", "admin"]),
+        default="teacher",
+        show_default=True,
+    )
+    def create_user(username, name, password, role):
+        """Provision a teacher or administrator account."""
+        username = username.strip()
+        name = name.strip()
+        if not username or not name:
+            raise click.ClickException("工号和姓名不能为空")
+        password = password or click.prompt(
+            "Password",
+            hide_input=True,
+            confirmation_prompt=True,
+        )
+        if len(password) < 12:
+            raise click.ClickException("密码至少需要 12 个字符")
+        if User.query.filter_by(username=username).first() is not None:
+            raise click.ClickException(f"账号 {username} 已存在")
+
+        user = User(username=username, name=name, role=role)
+        user.set_password(password)
+        db.session.add(user)
+        db.session.commit()
+        print(f"已创建{('管理员' if role == 'admin' else '教师')}账号 {username}。")
+
+    @app.cli.command("doctor")
+    @click.option(
+        "--strict",
+        is_flag=True,
+        help="发现阻塞级问题时返回非零退出码。",
+    )
+    def doctor(strict):
+        """检查密钥、持久化、数据库、存储、管理员和 AI 降级配置。"""
+        from .operations import run_doctor
+
+        checks = run_doctor(app)
+        labels = {"ok": "[正常]", "warning": "[提醒]", "error": "[阻塞]"}
+        for item in checks:
+            print(
+                f"{labels.get(item['level'], '[信息]')} "
+                f"{item['name']}：{item['message']}"
+            )
+        errors = sum(item["level"] == "error" for item in checks)
+        warnings = sum(item["level"] == "warning" for item in checks)
+        print(f"\n自检完成：{len(checks)} 项，阻塞 {errors}，提醒 {warnings}。")
+        if strict and errors:
+            raise SystemExit(1)
+
+    @app.cli.command("backup")
+    @click.option("--output", type=click.Path(dir_okay=False, path_type=Path))
+    @click.option("--force", is_flag=True, help="覆盖已存在的输出文件。")
+    def backup(output, force):
+        """备份数据库和本地文件，并写入可校验的 manifest。"""
+        from .operations import create_backup
+
+        result = create_backup(app, output=output, overwrite=force)
+        print(f"备份完成：{result['path']}")
+        print(f"数据库：{result['database']['kind']}")
+        if result["media"].get("included"):
+            print(f"本地文件：{result['media'].get('file_count', 0)} 个")
+        if result["media"].get("warning"):
+            print(f"[提醒] {result['media']['warning']}")
+
+    @app.cli.command("restore")
+    @click.argument("path", type=click.Path(exists=True, dir_okay=False, path_type=Path))
+    @click.option("--yes", is_flag=True, help="跳过确认。")
+    def restore(path, yes):
+        """恢复备份；恢复前自动再备份一次当前数据。"""
+        from .operations import create_backup, inspect_backup, restore_backup
+
+        inspected = inspect_backup(path)
+        if not yes:
+            click.confirm(
+                f"将用 {path} 覆盖当前数据库和本地文件，继续？",
+                abort=True,
+            )
+
+        safety = create_backup(
+            app,
+            output=Path(app.config["BACKUP_FOLDER"])
+            / f"pre-restore-{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%fZ')}.zip",
+        )
+        restore_backup(app, inspected["path"])
+        print(f"恢复完成：{inspected['path']}")
+        print(f"恢复前快照：{safety['path']}")
+        if not (inspected["manifest"].get("media") or {}).get("included"):
+            print("[提醒] 该备份不包含对象存储文件，请同步恢复 COS 对象。")
+
+    @app.cli.command("recover-reviews")
+    @click.option("--older-than", default=15, show_default=True, type=int)
+    def recover_reviews(older_than):
+        """把进程重启后遗留的预审任务标记为失败，允许人工兜底。"""
+        cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(
+            minutes=max(older_than, 1)
+        )
+        reviews = DocumentAiReview.query.filter(
+            DocumentAiReview.status.in_(("pending", "running"))
+        ).all()
+        recovered = 0
+        for review in reviews:
+            timestamp = review.started_at or review.created_at
+            if timestamp is None or timestamp >= cutoff:
+                continue
+            review.status = "failed"
+            review.error_message = (
+                "预审任务在进程重启或超时后中断；可重试或由负责人人工兜底"
+            )
+            review.finished_at = datetime.now(timezone.utc).replace(tzinfo=None)
+            recovered += 1
+        db.session.commit()
+        print(f"已恢复 {recovered} 条中断的预审任务。")

@@ -594,13 +594,6 @@ def document_ai_review(document_id):
             "文档还没有上传版本，无法预审", "no_version", 400
         )
 
-    if not ai.is_configured():
-        return api_error(
-            "当前环境没有配置 COSMOS_API_KEY，无法使用 AI 预审",
-            "ai_not_configured",
-            503,
-        )
-
     try:
         spec_ids = ai_review.normalize_spec_ids(
             document, payload.get("spec_document_ids")
@@ -615,6 +608,18 @@ def document_ai_review(document_id):
         source="manual",
         spec_ids=spec_ids,
     )
+    if not ai.is_configured():
+        review.status = "skipped"
+        review.error_message = (
+            "当前环境没有配置 COSMOS_API_KEY，预审已跳过；可人工兜底"
+        )
+        review.finished_at = utcnow()
+        db.session.commit()
+        return api_error(
+            "当前环境没有配置 COSMOS_API_KEY，已保留人工兜底记录",
+            "ai_not_configured",
+            503,
+        )
     review = ai_review.perform_review(review.id)
     if review is None:
         return api_error("预审任务不存在", "review_not_found", 404)
@@ -650,6 +655,52 @@ def list_document_ai_reviews(document_id):
     return api_success([review.to_dict() for review in reviews])
 
 
+@bp.post(
+    "/documents/<int:document_id>/ai/reviews/<int:review_id>/retry"
+)
+@login_required
+def retry_document_ai_review(document_id, review_id):
+    document = _get_document_or_404(document_id)
+    if document is None:
+        return api_error("文档不存在", "document_not_found", 404)
+    if not (current_user.is_admin or document.owner_id == current_user.id):
+        return api_error(
+            "只有管理员或文档负责人可以重试 AI 预审",
+            "permission_denied",
+            403,
+        )
+
+    review = db.session.get(DocumentAiReview, review_id)
+    if review is None or review.document_id != document.id:
+        return api_error("预审记录不存在", "review_not_found", 404)
+    if review.status not in {"failed", "skipped"}:
+        return api_error(
+            "只有失败或跳过的预审可以重试",
+            "review_not_retryable",
+            409,
+        )
+    if (review.human_decision or "pending") != "pending":
+        return api_error(
+            "已完成人工确认的预审不能再重试",
+            "review_already_decided",
+            409,
+        )
+    if not ai.is_configured():
+        return api_error(
+            "AI 仍未配置，可继续使用人工兜底完成审核",
+            "ai_not_configured",
+            503,
+        )
+
+    review.status = "pending"
+    review.error_message = ""
+    review.started_at = None
+    review.finished_at = None
+    db.session.commit()
+    review = ai_review.perform_review(review.id)
+    return api_success(review.to_dict())
+
+
 @bp.patch(
     "/documents/<int:document_id>/ai/reviews/<int:review_id>/decision"
 )
@@ -668,14 +719,21 @@ def decide_document_ai_review(document_id, review_id):
     review = db.session.get(DocumentAiReview, review_id)
     if review is None or review.document_id != document.id:
         return api_error("预审记录不存在", "review_not_found", 404)
-    if review.status != "done":
+    payload = request.get_json(silent=True) or {}
+    manual_fallback = bool(payload.get("manual_fallback"))
+    if review.status not in {"done", "failed", "skipped"}:
         return api_error(
-            "只有已完成的预审才能人工确认",
+            "预审仍在排队或执行，请完成后再确认",
             "review_not_done",
             409,
         )
+    if review.status in {"failed", "skipped"} and not manual_fallback:
+        return api_error(
+            "AI 预审未完成。若已人工核验，请明确选择人工兜底确认",
+            "manual_fallback_required",
+            409,
+        )
 
-    payload = request.get_json(silent=True) or {}
     decision = (payload.get("decision") or "").strip()
     if decision not in {"pass", "return"}:
         return api_error(
@@ -688,6 +746,16 @@ def decide_document_ai_review(document_id, review_id):
     if decision == "return" and not note:
         return api_error(
             "退回修改时需要填写原因", "note_required", 400
+        )
+    if (
+        decision == "pass"
+        and review.status in {"failed", "skipped"}
+        and not note
+    ):
+        return api_error(
+            "AI 不可用时人工通过必须填写核验说明",
+            "note_required",
+            400,
         )
 
     review.human_decision = decision

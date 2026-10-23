@@ -1,4 +1,4 @@
-from flask import jsonify
+from flask import g, has_request_context, jsonify
 
 
 def api_success(data=None, status=200):
@@ -6,7 +6,12 @@ def api_success(data=None, status=200):
 
 
 def api_error(message, code="bad_request", status=400):
-    return jsonify({"error": {"code": code, "message": message}}), status
+    error = {"code": code, "message": message}
+    if has_request_context():
+        request_id = getattr(g, "request_id", "")
+        if request_id:
+            error["request_id"] = request_id
+    return jsonify({"error": error}), status
 
 
 def format_size_limit(limit_bytes):

@@ -536,6 +536,10 @@ class DocumentAiReview(db.Model):
                 else None
             ),
             "human_reviewed_at": iso_utc(self.human_reviewed_at),
+            "manual_fallback_available": (
+                (self.status or "pending") in {"failed", "skipped"}
+                and (self.human_decision or "pending") == "pending"
+            ),
             "created_at": iso_utc(self.created_at),
         }
 

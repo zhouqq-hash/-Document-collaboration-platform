@@ -11,4 +11,10 @@ if __name__ == "__main__":
     #   $env:DOC_COLLAB_HOST = "0.0.0.0"
     host = os.environ.get("DOC_COLLAB_HOST", "127.0.0.1")
     port = int(os.environ.get("DOC_COLLAB_PORT", "5000"))
-    app.run(host=host, port=port, debug=True)
+    debug = os.environ.get("DOC_COLLAB_DEBUG", "1").lower() not in {
+        "0",
+        "false",
+        "no",
+        "off",
+    }
+    app.run(host=host, port=port, debug=debug)

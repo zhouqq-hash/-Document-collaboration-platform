@@ -33,16 +33,13 @@
         <form id="loginForm" class="form-grid">
           <div>
             <label for="username">工号</label>
-            <input id="username" name="username" value="admin" required />
+            <input id="username" name="username" autocomplete="username" required />
           </div>
           <div>
             <label for="password">密码</label>
-            <input id="password" name="password" type="password" value="admin123" required />
+            <input id="password" name="password" type="password" autocomplete="current-password" required />
           </div>
-          <p class="muted">
-            演示账号：admin / admin123（管理员），teacher / teacher123（负责人），
-            viewer / viewer123（普通教师）
-          </p>
+          <p id="demoCredentials" class="muted" hidden></p>
           <button class="btn btn-primary" type="submit">登录</button>
         </form>
         <div id="wechatLogin" class="wechat-login" hidden></div>

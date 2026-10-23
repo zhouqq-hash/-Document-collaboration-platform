@@ -26,6 +26,19 @@ def test_login_and_me(client):
     assert me.get_json()["data"]["username"] == "admin"
 
 
+def test_login_config_hides_demo_credentials_in_public_mode(app, client):
+    demo = client.get("/api/auth/config").get_json()["data"]
+    assert {item["username"] for item in demo["demo_credentials"]} == {
+        "admin",
+        "teacher",
+        "viewer",
+    }
+
+    app.config["SHOW_DEMO_CREDENTIALS"] = False
+    hidden = client.get("/api/auth/config").get_json()["data"]
+    assert hidden["demo_credentials"] == []
+
+
 def test_teacher_can_list_categories(client):
     login(client)
     response = client.get("/api/categories")
