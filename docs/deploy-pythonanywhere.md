@@ -83,16 +83,25 @@ export TRUST_PROXY_HEADERS=1
 
 ## 5. 初始化数据库和管理员
 
+先激活虚拟环境，然后执行一个引导脚本：
+
 ```bash
+workon doc-collab-env
 cd ~/doc-collab
-flask --app backend/run.py db upgrade
-flask --app backend/run.py bootstrap-admin --username admin
-flask --app backend/run.py create-user --username teacher01 --name "张老师"
-flask --app backend/run.py doctor --strict
+bash scripts/pythonanywhere-bootstrap.sh
 ```
 
-密码会隐藏输入并要求二次确认。不要执行 `seed`、`demo-reset`，也不要创建
-`admin123` / `teacher123` 这类演示弱口令。
+脚本会检查仓库无未提交改动，创建持久数据目录和随机密钥，执行迁移、管理员初始化和
+`doctor --strict`。管理员密码会隐藏输入并要求二次确认。
+
+完成后创建教师账号：
+
+```bash
+python -m flask --app backend/run.py create-user \
+  --username teacher01 --name "张老师"
+```
+
+不要执行 `seed`、`demo-reset`，也不要创建 `admin123` / `teacher123` 这类演示弱口令。
 
 `doctor --strict` 必须没有阻塞项；AI 未配置只会显示提醒，不影响核心业务。
 
