@@ -148,6 +148,64 @@
         border-bottom: 1px solid var(--line);
       }
 
+      .module-masthead {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(220px, 300px);
+        align-items: end;
+        gap: 36px;
+        margin: 0 0 34px;
+        padding: 8px 0 26px;
+        border-bottom: 1px solid var(--line-strong);
+      }
+
+      .module-identity {
+        display: flex;
+        align-items: center;
+        gap: 18px;
+      }
+
+      .module-seal {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        flex: none;
+        width: 56px;
+        height: 56px;
+        border-radius: 4px;
+        background: var(--cinnabar);
+        color: #fff7ef;
+        font-family: var(--font-display);
+        font-size: 28px;
+        font-weight: 600;
+        line-height: 1;
+        box-shadow: 5px 5px 0 #f8ece8;
+      }
+
+      .module-title {
+        margin: 0;
+        font-family: var(--font-display);
+        font-size: 36px;
+        font-weight: 600;
+        letter-spacing: 0.02em;
+        line-height: 1.15;
+        color: var(--ink-deep);
+      }
+
+      .module-subtitle {
+        margin: 6px 0 0;
+        color: var(--muted);
+        font-size: 14px;
+      }
+
+      .module-note {
+        margin: 0;
+        padding-left: 18px;
+        border-left: 1px solid var(--line-strong);
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.8;
+      }
+
       h1 {
         margin: 0 0 6px;
         font-family: var(--font-display);
@@ -423,6 +481,29 @@
           transition-duration: 0.001ms !important;
         }
       }
+
+      @media (max-width: 720px) {
+        .module-masthead {
+          grid-template-columns: 1fr;
+          gap: 20px;
+        }
+
+        .module-seal {
+          width: 48px;
+          height: 48px;
+          font-size: 24px;
+        }
+
+        .module-title {
+          font-size: 30px;
+        }
+
+        .module-note {
+          padding: 14px 0 0;
+          border-top: 1px solid var(--line);
+          border-left: 0;
+        }
+      }
     </style>
   </head>
   <body>
@@ -440,9 +521,17 @@
     </header>
 
     <main class="container" id="entryMain" style="display: none">
-      <header class="page-head">
-        <h1>工作台</h1>
-        <p class="subtitle" id="welcomeText">正在加载…</p>
+      <header class="module-masthead">
+        <div class="module-identity">
+          <span class="module-seal" aria-hidden="true">台</span>
+          <div>
+            <h1 class="module-title">工作台</h1>
+            <p class="module-subtitle" id="welcomeText">正在加载…</p>
+          </div>
+        </div>
+        <p class="module-note">
+          文档、讨论与表格从这里进入，最近动态保持在视线之内。
+        </p>
       </header>
 
       <section class="ledger">
@@ -461,7 +550,7 @@
       </section>
 
       <div class="grid">
-        <a class="card" href="documents/index.html">
+        <a class="card" href="documents/categories.html">
           <span class="tag tag-count" id="tagDocuments">文档管理</span>
           <h2>
             <svg class="card-icon" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
@@ -508,7 +597,7 @@
         <section class="panel">
           <div class="panel-head">
             <h2>最近文档</h2>
-            <a href="documents/index.html">全部文档</a>
+            <a href="documents/categories.html">全部文档</a>
           </div>
           <div id="recentDocuments" class="muted">加载中…</div>
         </section>

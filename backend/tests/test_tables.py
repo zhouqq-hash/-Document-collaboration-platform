@@ -44,6 +44,23 @@ def test_create_table_requires_columns(client):
     assert response.get_json()["error"]["code"] == "invalid_columns"
 
 
+def test_create_table_rejects_duplicate_or_too_many_columns(client):
+    login(client)
+    duplicate = client.post(
+        "/api/tables",
+        json={"name": "重复列", "columns": ["姓名", "姓名"]},
+    )
+    assert duplicate.status_code == 400
+    assert duplicate.get_json()["error"]["code"] == "invalid_columns"
+
+    too_many = client.post(
+        "/api/tables",
+        json={"name": "太多列", "columns": [f"列{index}" for index in range(31)]},
+    )
+    assert too_many.status_code == 400
+    assert too_many.get_json()["error"]["code"] == "invalid_columns"
+
+
 def test_any_teacher_can_create_table(client):
     response = create_table(client, username="teacher")
     assert response.status_code == 201

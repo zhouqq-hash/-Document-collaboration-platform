@@ -62,6 +62,37 @@ def test_create_document_and_version_increment(client):
     assert detail.get_json()["data"]["current_version"]["version_number"] == 2
 
 
+def test_create_document_rejects_overlong_text_fields(client):
+    login(client, "admin", "admin123")
+    base = {
+        "category_id": "1",
+        "owner_id": "2",
+        "changelog": "初始版本",
+        "file": (io.BytesIO(b"content"), "plan.txt"),
+    }
+
+    title = client.post(
+        "/api/documents",
+        data={**base, "title": "题" * 201},
+        content_type="multipart/form-data",
+    )
+    assert title.status_code == 400
+    assert title.get_json()["error"]["code"] == "invalid_title"
+
+    description = client.post(
+        "/api/documents",
+        data={
+            **base,
+            "title": "正常标题",
+            "description": "说" * 501,
+            "file": (io.BytesIO(b"content"), "plan.txt"),
+        },
+        content_type="multipart/form-data",
+    )
+    assert description.status_code == 400
+    assert description.get_json()["error"]["code"] == "invalid_description"
+
+
 def test_teacher_cannot_upload_if_not_owner(client):
     document = create_document(client).get_json()["data"]
     client.post("/api/auth/logout")
@@ -108,6 +139,78 @@ def test_download_version(client):
     )
     assert response.status_code == 200
     assert response.data == b"first version"
+
+
+def test_rollback_version_restores_content_and_increments(client):
+    document = create_document(client).get_json()["data"]
+    first_version_id = document["current_version"]["id"]
+
+    client.post(
+        f"/api/documents/{document['id']}/versions",
+        data={
+            "changelog": "第二次修订",
+            "file": (io.BytesIO(b"second version"), "plan_v2.txt"),
+        },
+        content_type="multipart/form-data",
+    )
+
+    rollback = client.post(
+        f"/api/documents/{document['id']}/versions/{first_version_id}/rollback"
+    )
+    assert rollback.status_code == 201
+    new_version = rollback.get_json()["data"]
+    assert new_version["version_number"] == 3
+    assert new_version["changelog"] == "回滚到版本 1"
+
+    detail = client.get(f"/api/documents/{document['id']}")
+    assert detail.get_json()["data"]["current_version"]["version_number"] == 3
+
+    versions = client.get(
+        f"/api/documents/{document['id']}/versions"
+    ).get_json()["data"]
+    assert [item["version_number"] for item in versions] == [3, 2, 1]
+
+    download = client.get(
+        f"/api/documents/{document['id']}/versions/{new_version['id']}/download"
+    )
+    assert download.data == b"first version"
+
+
+def test_owner_can_rollback(client):
+    document = create_document(client).get_json()["data"]
+    version_id = document["current_version"]["id"]
+
+    client.post("/api/auth/logout")
+    login(client, "teacher", "teacher123")
+    response = client.post(
+        f"/api/documents/{document['id']}/versions/{version_id}/rollback"
+    )
+    assert response.status_code == 201
+    assert response.get_json()["data"]["version_number"] == 2
+    assert response.get_json()["data"]["uploader"]["username"] == "teacher"
+
+
+def test_non_owner_cannot_rollback(client):
+    document = create_document(client).get_json()["data"]
+    version_id = document["current_version"]["id"]
+
+    client.post("/api/auth/logout")
+    login(client, "other", "other123")
+    response = client.post(
+        f"/api/documents/{document['id']}/versions/{version_id}/rollback"
+    )
+    assert response.status_code == 403
+    assert response.get_json()["error"]["code"] == "permission_denied"
+
+
+def test_rollback_missing_version_returns_404(client):
+    document = create_document(client).get_json()["data"]
+
+    response = client.post(
+        f"/api/documents/{document['id']}/versions/999/rollback"
+    )
+    assert response.status_code == 404
+    assert response.get_json()["error"]["code"] == "version_not_found"
 
 
 def test_teacher_cannot_create_category(client):

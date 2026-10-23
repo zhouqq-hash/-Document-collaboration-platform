@@ -30,6 +30,7 @@
           <div class="head-actions">
             <a class="btn btn-ghost" href="index.html">返回列表</a>
             <button class="btn btn-ghost" id="editInfoButton" type="button" hidden>编辑信息</button>
+            <button class="btn btn-ghost" id="importButton" type="button" hidden>导入文件</button>
             <button class="btn btn-ghost" id="addColumnButton" type="button">新增列</button>
             <button class="btn btn-primary" id="addRowButton" type="button">新增行</button>
           </div>
@@ -128,6 +129,40 @@
       </div>
     </div>
 
+    <div class="dialog-backdrop" id="importDialog" hidden>
+      <div class="dialog import-dialog">
+        <h2>导入 Excel / CSV</h2>
+        <form class="form-grid" id="importForm">
+          <div class="import-warning">
+            导入会覆盖当前表格内容。系统会先自动保存当前版本，导入后仍可从版本历史回滚。
+          </div>
+          <div>
+            <label for="importFile">选择文件</label>
+            <input
+              id="importFile"
+              name="file"
+              type="file"
+              accept=".xlsx,.xls,.csv"
+              required
+            />
+            <p class="hint">
+              读取第一个工作表，最多 2,000 行、30 列、5 MB。合并单元格会拆开，边框和颜色不保留。
+              旧版 .xls 只能稳定导入计算结果，需要继续公式协作时请另存为 .xlsx。
+            </p>
+          </div>
+          <div class="formula-help">
+            支持四则运算、单元格/区域引用及 SUM、AVERAGE、COUNT、MIN、MAX、IF、ROUND 等常用函数。
+            无法计算且没有原始结果的公式会导致整次导入被拒绝。
+          </div>
+          <div class="import-result" id="importResult" hidden></div>
+          <div class="dialog-actions">
+            <button class="btn btn-ghost" id="cancelImport" type="button">取消</button>
+            <button class="btn btn-primary" id="submitImport" type="submit">覆盖并导入</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
     <div class="dialog-backdrop" id="previewDialog" hidden>
       <div class="dialog" style="width: min(720px, 100%)">
         <h2 id="previewTitle">版本预览</h2>
@@ -189,6 +224,9 @@
         document.getElementById("columnForm").addEventListener("submit", onAddColumn);
 
         document.getElementById("editInfoButton").addEventListener("click", openInfoDialog);
+        document.getElementById("importButton").addEventListener("click", openImportDialog);
+        document.getElementById("cancelImport").addEventListener("click", closeImportDialog);
+        document.getElementById("importForm").addEventListener("submit", onImport);
         document.getElementById("cancelInfo").addEventListener("click", () => {
           document.getElementById("infoDialog").hidden = true;
         });
@@ -261,6 +299,7 @@
           `${table.column_count} 列 · ${table.row_count} 行 · 版本 ${table.version_number}` +
           ` · 负责人 ${table.owner?.name || ""} · 更新于 ${formatTime(table.updated_at)}`;
         document.getElementById("editInfoButton").hidden = !table.can_manage;
+        document.getElementById("importButton").hidden = !table.can_manage;
         document.getElementById("snapshotButton").hidden = !table.can_manage;
       }
 
@@ -416,11 +455,29 @@
               const cells = columns
                 .map((col) => {
                   const value = row.cells?.[col.key] ?? "";
-                  return `<td data-col="${escapeHtml(col.key)}"><span class="cell" contenteditable="true" data-row="${escapeHtml(
-                    row.row_key
-                  )}" data-col="${escapeHtml(col.key)}" data-original="${escapeHtml(value)}">${escapeHtml(
+                  const meta =
+                    table.cell_meta?.[`${row.row_key}:${col.key}`] || {};
+                  const formula = meta.formula || "";
+                  const locked = Boolean(meta.locked);
+                  const cellClasses = [
+                    "cell",
+                    formula ? "cell-formula" : "",
+                    locked ? "cell-locked" : "",
+                  ]
+                    .filter(Boolean)
+                    .join(" ");
+                  const title = formula
+                    ? `${formula}${meta.warning ? `\n${meta.warning}` : ""}`
+                    : "";
+                  return `<td data-col="${escapeHtml(col.key)}"><span class="${cellClasses}" contenteditable="${
+                    locked ? "false" : "true"
+                  }" data-row="${escapeHtml(row.row_key)}" data-col="${escapeHtml(
+                    col.key
+                  )}" data-original="${escapeHtml(value)}" data-result="${escapeHtml(
                     value
-                  )}</span></td>`;
+                  )}" data-formula="${escapeHtml(formula)}" title="${escapeHtml(
+                    title
+                  )}">${escapeHtml(value)}</span></td>`;
                 })
                 .join("");
               return `<tr data-row="${escapeHtml(row.row_key)}"><td class="row-head" data-row="${escapeHtml(
@@ -432,6 +489,9 @@
 
         body.querySelectorAll(".cell").forEach((cell) => {
           cell.addEventListener("focus", () => {
+            if (cell.dataset.formula && cell.isContentEditable) {
+              cell.textContent = cell.dataset.formula;
+            }
             cell.classList.add("cell-editing");
             setActiveCell(cell.dataset.row, cell.dataset.col);
           });
@@ -502,24 +562,25 @@
         const columnKey = cell.dataset.col;
         const value = cell.textContent;
         const original = cell.dataset.original;
+        const formula = cell.dataset.formula;
+        if (formula && value === formula) {
+          cell.textContent = cell.dataset.result;
+          return;
+        }
         if (value === original) {
           return;
         }
         try {
-          await apiRequest(`/api/tables/${tableId}/cells`, {
+          const result = await apiRequest(`/api/tables/${tableId}/cells`, {
             method: "PATCH",
             body: JSON.stringify({ row_key: rowKey, column_key: columnKey, value }),
           });
-          cell.dataset.original = value;
-          const row = (table.rows || []).find((item) => item.row_key === rowKey);
-          if (row) {
-            row.cells = row.cells || {};
-            row.cells[columnKey] = value;
-          }
+          table = result.table;
+          renderGrid();
           toast("已保存", "success");
           await loadChanges();
         } catch (error) {
-          cell.textContent = original;
+          cell.textContent = cell.dataset.result;
           toast(error.message, "error");
         }
       }
@@ -744,6 +805,81 @@
           renderHeader();
         } catch (error) {
           toast(error.message, "error");
+        }
+      }
+
+      function openImportDialog() {
+        document.getElementById("importFile").value = "";
+        document.getElementById("importResult").hidden = true;
+        document.getElementById("importResult").textContent = "";
+        document.getElementById("submitImport").disabled = false;
+        document.getElementById("submitImport").textContent = "覆盖并导入";
+        document.getElementById("importDialog").hidden = false;
+        document.getElementById("importFile").focus();
+      }
+
+      function closeImportDialog() {
+        document.getElementById("importDialog").hidden = true;
+      }
+
+      async function onImport(event) {
+        event.preventDefault();
+        const file = document.getElementById("importFile").files?.[0];
+        if (!file) {
+          toast("请选择要导入的文件", "error");
+          return;
+        }
+        if (!/\.(xlsx|xls|csv)$/i.test(file.name)) {
+          toast("仅支持 .xlsx、.xls、.csv 文件", "error");
+          return;
+        }
+        if (file.size > 5 * 1024 * 1024) {
+          toast("导入文件不能超过 5 MB", "error");
+          return;
+        }
+        if (
+          !window.confirm(
+            "导入会覆盖当前表格内容。系统会先自动保存一个可回滚版本，确定继续吗？"
+          )
+        ) {
+          return;
+        }
+
+        const submit = document.getElementById("submitImport");
+        const formData = new FormData();
+        formData.append("file", file);
+        submit.disabled = true;
+        submit.textContent = "正在导入…";
+        try {
+          const result = await apiRequest(`/api/tables/${tableId}/import`, {
+            method: "POST",
+            body: formData,
+          });
+          table = result.table;
+          closeImportDialog();
+          await loadAll();
+          toast(
+            `已导入 ${result.summary.row_count} 行、${result.summary.column_count} 列`,
+            "success"
+          );
+          const locked = result.summary.locked_formulas || [];
+          if (locked.length) {
+            const details = locked
+              .slice(0, 5)
+              .map((item) => `${item.cell}：${item.reason}`)
+              .join("\n");
+            window.alert(
+              `有 ${locked.length} 个公式无法在平台内计算，已保留原结果并锁定。\n\n${details}`
+            );
+          }
+        } catch (error) {
+          const resultNode = document.getElementById("importResult");
+          resultNode.textContent = error.message;
+          resultNode.hidden = false;
+          toast(error.message, "error");
+        } finally {
+          submit.disabled = false;
+          submit.textContent = "覆盖并导入";
         }
       }
 

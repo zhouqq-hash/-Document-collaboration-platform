@@ -10,7 +10,12 @@ function safeNextUrl() {
   if (next && next.startsWith("/") && !next.startsWith("//") && !next.includes("\\")) {
     return next;
   }
-  return "categories.html";
+  return "/";
+}
+
+function loginPageUrl() {
+  const next = window.location.pathname + window.location.search;
+  return `index.html?next=${encodeURIComponent(next)}`;
 }
 
 function escapeHtml(value) {
@@ -254,7 +259,7 @@ async function apiRequest(path, options = {}, { redirectOn401 = true } = {}) {
 
   if (response.status === 401) {
     if (redirectOn401 && document.body.dataset.page !== "login") {
-      window.location.href = "index.html";
+      window.location.href = loginPageUrl();
     }
     const error = new Error(payload?.error?.message || "请先登录");
     error.status = 401;
@@ -298,7 +303,6 @@ function renderTopbar(user) {
     user.role === "admin"
       ? `
         <nav class="admin-nav">
-          <a href="create-document.html">新建文档</a>
           <a href="manage-categories.html">分类管理</a>
         </nav>
       `
@@ -673,7 +677,7 @@ function initWechatCallback() {
   }
 
   if (!failed) {
-    window.location.replace("categories.html");
+    window.location.replace("/");
   }
 }
 
@@ -851,6 +855,8 @@ async function initCategories() {
 
   try {
     const categories = await apiRequest("/api/categories");
+    document.getElementById("categoryCount").textContent =
+      categories.length ? `共 ${categories.length} 个分类` : "暂无分类";
     container.innerHTML = categories.length
       ? categories
           .map(
@@ -865,18 +871,38 @@ async function initCategories() {
           .join("")
       : '<div class="card muted">暂无分类</div>';
   } catch (error) {
+    const countNode = document.getElementById("categoryCount");
+    if (countNode) {
+      countNode.textContent = "分类加载失败";
+    }
     showPageMessage("categoryList", error.message, true);
   }
 }
 
 async function initDocuments() {
-  await requireUser();
+  const user = await requireUser();
   const categoryId = qs("category_id") || "";
   const filterWrap = document.getElementById("categoryFilterWrap");
-  const list = document.getElementById("documentList");
+  const list = document.getElementById("documentCards");
+  const countNode = document.getElementById("documentCount");
+  const createLink = document.getElementById("createDocumentLink");
 
   try {
     const categories = await apiRequest("/api/categories");
+    if (user.role === "admin") {
+      const selectedCategory = categories.find(
+        (category) => String(category.id) === String(categoryId)
+      );
+      const query = categoryId
+        ? `?category_id=${encodeURIComponent(categoryId)}`
+        : "";
+      createLink.href = `create-document.html${query}`;
+      document.getElementById("createDocumentDescription").textContent =
+        selectedCategory
+          ? `新文档将归入“${selectedCategory.name}”分类。`
+          : "创建一个新文档，分类可在下一步选择。";
+    }
+
     const filter = createSearchableSelect({
       options: [
         { value: "", label: "全部分类" },
@@ -908,29 +934,57 @@ async function initDocuments() {
       : "/api/documents";
     const documents = await apiRequest(path);
 
+    countNode.textContent = documents.length
+      ? `共 ${documents.length} 份文档`
+      : "暂无文档";
+
+    if (user.role === "admin") {
+      createLink.hidden = false;
+    }
+
     list.innerHTML = documents.length
       ? documents
           .map((document) => {
             const current = document.current_version;
             return `
-              <tr>
-                <td><a href="document-detail.html?id=${document.id}">${escapeHtml(
+              <a class="document-card" href="document-detail.html?id=${document.id}">
+                <span class="document-card-top">
+                  <span class="document-card-category">${escapeHtml(
+                    document.category.name
+                  )}</span>
+                  ${statusBadge(document.status)}
+                </span>
+                <strong class="document-card-title">${escapeHtml(
                   document.title
-                )}</a></td>
-                <td>${escapeHtml(document.category.name)}</td>
-                <td>${escapeHtml(document.owner.name)}</td>
-                <td>${statusBadge(document.status)}</td>
-                <td>v${current ? current.version_number : 0}</td>
-                <td>${formatTime(document.updated_at)}</td>
-              </tr>
+                )}</strong>
+                <span class="document-card-description">${escapeHtml(
+                  document.description || "暂无文档说明"
+                )}</span>
+                <span class="document-card-footer">
+                  <span>
+                    <span class="document-card-label">负责人</span>
+                    <strong>${escapeHtml(document.owner.name)}</strong>
+                  </span>
+                  <span>
+                    <span class="document-card-label">当前版本</span>
+                    <strong>v${current ? current.version_number : 0}</strong>
+                  </span>
+                </span>
+                <span class="document-card-time">最近更新 ${formatTime(
+                  document.updated_at
+                )}</span>
+              </a>
             `;
           })
           .join("")
-      : '<tr><td colspan="6" class="muted">该分类暂无文档</td></tr>';
+      : user.role === "admin"
+        ? ""
+        : '<div class="document-grid-empty">该分类暂无文档</div>';
   } catch (error) {
-    list.innerHTML = `<tr><td colspan="6" class="notice">${escapeHtml(
+    countNode.textContent = "加载失败";
+    list.innerHTML = `<div class="document-grid-empty notice">${escapeHtml(
       error.message
-    )}</td></tr>`;
+    )}</div>`;
   }
 }
 
@@ -1665,15 +1719,131 @@ async function initCreateDocument() {
   const user = await requireUser();
   const form = document.getElementById("createDocumentForm");
   applyFileAccept("file");
+  const categoryIdFromQuery = qs("category_id") || "";
+  const backHref = categoryIdFromQuery
+    ? `documents.html?category_id=${encodeURIComponent(categoryIdFromQuery)}`
+    : "documents.html";
+  document.getElementById("backToDocuments").href = backHref;
+  form.querySelectorAll('.create-form-actions a[href="documents.html"]').forEach((link) => {
+    link.href = backHref;
+  });
 
   if (user.role !== "admin") {
-    form.closest(".card").style.display = "none";
+    form.hidden = true;
     showPageMessage("pageMessage", "只有管理员可以新建文档。", true);
     return;
   }
 
   let categorySelect;
   let ownerSelect;
+  const titleInput = document.getElementById("title");
+  const descriptionInput = document.getElementById("description");
+  const fileInput = document.getElementById("file");
+  const fileDrop = document.getElementById("fileDrop");
+  const selectedFileBox = document.getElementById("selectedFile");
+  const submitButton = form.querySelector('button[type="submit"]');
+  const allowedFilePattern = /\.(pdf|doc|docx|xls|xlsx|ppt|pptx|txt)$/i;
+
+  function clearErrors() {
+    form.querySelectorAll(".field-error").forEach((node) => {
+      node.textContent = "";
+    });
+    form.querySelectorAll(".form-field.invalid").forEach((node) => {
+      node.classList.remove("invalid");
+    });
+    document.getElementById("pageMessage").innerHTML = "";
+  }
+
+  function setFieldError(errorId, message) {
+    const errorNode = document.getElementById(errorId);
+    if (!errorNode) {
+      return;
+    }
+    errorNode.textContent = message;
+    errorNode.closest(".form-field")?.classList.add("invalid");
+  }
+
+  function showFormError(message) {
+    showPageMessage("pageMessage", message, true);
+    document.getElementById("pageMessage").scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+  }
+
+  function updateCounters() {
+    document.getElementById("titleCount").textContent = titleInput.value.length;
+    document.getElementById("descriptionCount").textContent =
+      descriptionInput.value.length;
+  }
+
+  function formatFileSize(bytes) {
+    if (bytes < 1024 * 1024) {
+      return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+    }
+    return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+  }
+
+  function chooseFile(file) {
+    if (!file) {
+      fileInput.value = "";
+      fileDrop.hidden = false;
+      selectedFileBox.hidden = true;
+      return;
+    }
+    const transfer = new DataTransfer();
+    transfer.items.add(file);
+    fileInput.files = transfer.files;
+    fileDrop.hidden = true;
+    selectedFileBox.hidden = false;
+    document.getElementById("selectedFileName").textContent = file.name;
+    document.getElementById("selectedFileMeta").textContent = formatFileSize(
+      file.size
+    );
+  }
+
+  function validateFile(file) {
+    if (!file) {
+      return "请选择首个版本文件";
+    }
+    if (!allowedFilePattern.test(file.name)) {
+      return "仅支持 PDF、Word、Excel、PPT、TXT 文件";
+    }
+    if (file.size > 50 * 1024 * 1024) {
+      return "文件不能超过 50 MB，请压缩后重试";
+    }
+    return "";
+  }
+
+  titleInput.addEventListener("input", updateCounters);
+  descriptionInput.addEventListener("input", updateCounters);
+  fileInput.addEventListener("change", () => {
+    chooseFile(fileInput.files?.[0] || null);
+    updateCounters();
+    document.getElementById("fileError").textContent = "";
+    fileDrop.closest(".form-field")?.classList.remove("invalid");
+  });
+  document.getElementById("clearFile").addEventListener("click", () => {
+    chooseFile(null);
+    fileInput.focus();
+  });
+  fileDrop.addEventListener("dragover", (event) => {
+    event.preventDefault();
+    fileDrop.classList.add("dragging");
+  });
+  fileDrop.addEventListener("dragleave", () => {
+    fileDrop.classList.remove("dragging");
+  });
+  fileDrop.addEventListener("drop", (event) => {
+    event.preventDefault();
+    fileDrop.classList.remove("dragging");
+    const file = event.dataTransfer?.files?.[0];
+    if (file) {
+      chooseFile(file);
+      fileInput.dispatchEvent(new Event("change"));
+    }
+  });
+  updateCounters();
 
   try {
     const [categories, users] = await Promise.all([
@@ -1686,6 +1856,14 @@ async function initCreateDocument() {
         value: String(category.id),
         label: category.name,
       })),
+      value:
+        categories.some(
+          (category) => String(category.id) === categoryIdFromQuery
+        )
+          ? categoryIdFromQuery
+          : categories.length === 1
+            ? String(categories[0].id)
+            : "",
       placeholder: "请选择分类",
     });
     document.getElementById("categorySelect").appendChild(categorySelect.root);
@@ -1695,35 +1873,61 @@ async function initCreateDocument() {
         value: String(item.id),
         label: `${item.name}（${item.username}）`,
       })),
+      value: String(user.id),
       placeholder: "请选择负责人",
     });
     document.getElementById("ownerSelect").appendChild(ownerSelect.root);
+
+    if (!categories.length) {
+      showFormError("还没有文档分类，请先创建分类后再新建文档。");
+      submitButton.disabled = true;
+      return;
+    }
   } catch (error) {
-    showPageMessage("pageMessage", error.message, true);
+    showFormError(error.message);
     return;
   }
 
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
-    const title = document.getElementById("title").value.trim();
-    const file = document.getElementById("file").files[0];
+    clearErrors();
+    const title = titleInput.value.trim();
+    const description = descriptionInput.value.trim();
+    const changelog =
+      document.getElementById("changelog").value.trim() || "初始版本";
+    const file = fileInput.files?.[0] || null;
     const categoryId = categorySelect.getValue();
     const ownerId = ownerSelect.getValue();
+    let firstInvalid = null;
 
     if (!title) {
-      alert("请填写文档标题");
-      return;
+      setFieldError("titleError", "请填写文档标题");
+      firstInvalid ||= titleInput;
+    } else if (title.length > 200) {
+      setFieldError("titleError", "文档标题不能超过 200 个字符");
+      firstInvalid ||= titleInput;
     }
     if (!categoryId) {
-      alert("请选择分类");
-      return;
+      setFieldError("categoryError", "请选择所属分类");
+      firstInvalid ||= document.getElementById("categorySelect");
     }
     if (!ownerId) {
-      alert("请选择负责人");
-      return;
+      setFieldError("ownerError", "请选择负责人");
+      firstInvalid ||= document.getElementById("ownerSelect");
     }
-    if (!file) {
-      alert("请选择文件");
+    const fileError = validateFile(file);
+    if (fileError) {
+      setFieldError("fileError", fileError);
+      firstInvalid ||= fileInput;
+    }
+    if (description.length > 500) {
+      setFieldError("descriptionError", "文档说明不能超过 500 个字符");
+      firstInvalid ||= descriptionInput;
+    }
+    if (firstInvalid) {
+      const focusTarget =
+        firstInvalid.querySelector?.(".search-select-trigger") || firstInvalid;
+      focusTarget.focus?.();
       return;
     }
 
@@ -1731,13 +1935,12 @@ async function initCreateDocument() {
     formData.append("title", title);
     formData.append("category_id", categoryId);
     formData.append("owner_id", ownerId);
-    formData.append("description", document.getElementById("description").value.trim());
-    formData.append("changelog", document.getElementById("changelog").value.trim());
+    formData.append("description", description);
+    formData.append("changelog", changelog);
     formData.append("file", file);
 
-    const submitButton = form.querySelector('button[type="submit"]');
     submitButton.disabled = true;
-    submitButton.textContent = "创建中...";
+    submitButton.textContent = "正在上传并创建…";
     try {
       const doc = await apiRequest("/api/documents", {
         method: "POST",
@@ -1745,10 +1948,10 @@ async function initCreateDocument() {
       });
       window.location.href = `document-detail.html?id=${doc.id}`;
     } catch (error) {
-      alert(error.message);
+      showFormError(error.message);
     } finally {
       submitButton.disabled = false;
-      submitButton.textContent = "创建文档";
+      submitButton.textContent = "创建文档并生成 v1";
     }
   });
 }

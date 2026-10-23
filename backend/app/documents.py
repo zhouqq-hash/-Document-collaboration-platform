@@ -227,6 +227,15 @@ def create_document():
     title = (request.form.get("title") or "").strip()
     if not title:
         return api_error("文档标题不能为空", "invalid_title", 400)
+    if len(title) > 200:
+        return api_error("文档标题不能超过 200 个字符", "invalid_title", 400)
+
+    description = (request.form.get("description") or "").strip()
+    if len(description) > 500:
+        return api_error("文档说明不能超过 500 个字符", "invalid_description", 400)
+    changelog = (request.form.get("changelog") or "").strip()
+    if len(changelog) > 500:
+        return api_error("版本说明不能超过 500 个字符", "invalid_changelog", 400)
 
     category = _get_category_or_404(request.form.get("category_id", type=int))
     if category is None:
@@ -239,11 +248,11 @@ def create_document():
     document = Document(title=title, category=category, owner=owner)
     db.session.add(document)
     db.session.flush()
-    document.description = request.form.get("description", "")
+    document.description = description
 
     try:
         version = _create_version(
-            document, request.files.get("file"), request.form.get("changelog")
+            document, request.files.get("file"), changelog
         )
     except ValueError as exc:
         db.session.rollback()
@@ -362,6 +371,48 @@ def download_version(document_id, version_id):
         as_attachment=True,
         download_name=version.filename,
     )
+
+
+#回滚版本：把历史版本复制成新的当前版本，版本号递增、历史不被覆盖
+@bp.post("/documents/<int:document_id>/versions/<int:version_id>/rollback")
+@login_required
+def rollback_version(document_id, version_id):
+    document = _get_document_or_404(document_id)
+    if document is None:
+        return api_error("文档不存在", "document_not_found", 404)
+
+    if not (current_user.is_admin or document.owner_id == current_user.id):
+        return api_error("只有管理员或文档负责人可以回滚版本", "permission_denied", 403)
+
+    version = db.session.get(DocumentVersion, version_id)
+    if version is None or version.document_id != document.id:
+        return api_error("版本不存在", "version_not_found", 404)
+
+    next_number = max(
+        (item.version_number for item in document.versions), default=0
+    ) + 1
+    extension = Path(version.filename).suffix.lower()
+    new_key = (
+        f"doc_{document.id}_v{next_number}_{int(time.time() * 1000)}{extension}"
+    )
+    try:
+        current_app.extensions["storage"].copy(version.file_path, new_key)
+    except StorageError as exc:
+        db.session.rollback()
+        return api_error(str(exc), "storage_error", 500)
+
+    new_version = DocumentVersion(
+        document=document,
+        version_number=next_number,
+        filename=version.filename,
+        file_path=new_key,
+        changelog=f"回滚到版本 {version.version_number}",
+        uploader=current_user,
+    )
+    db.session.add(new_version)
+    document.updated_at = datetime.now(timezone.utc)
+    db.session.commit()
+    return api_success(new_version.to_dict(), status=201)
 
 
 # ------------------------------------------------------------------ AI 辅助

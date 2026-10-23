@@ -5,6 +5,7 @@
 因此业务代码不需要关心底层是本地还是云端。
 """
 import os
+import shutil
 from pathlib import Path
 
 
@@ -31,6 +32,12 @@ class LocalStorage:
         path.parent.mkdir(parents=True, exist_ok=True)
         file_storage.save(str(path))
 
+    def copy(self, src_key, dst_key):
+        src = self._resolve(src_key)
+        dst = self._resolve(dst_key)
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(src, dst)
+
     def read(self, key):
         return self._resolve(key).read_bytes()
 
@@ -55,12 +62,24 @@ class CosStorage:
         )
         self.client = CosS3Client(config)
         self.bucket = bucket
+        self.region = region
 
     def save(self, file_storage, key):
         self.client.put_object(
             Bucket=self.bucket,
             Body=file_storage.read(),
             Key=key,
+        )
+
+    def copy(self, src_key, dst_key):
+        self.client.copy_object(
+            Bucket=self.bucket,
+            Key=dst_key,
+            CopySource={
+                "Bucket": self.bucket,
+                "Key": src_key,
+                "Region": self.region,
+            },
         )
 
     def read(self, key):

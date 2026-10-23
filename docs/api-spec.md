@@ -209,6 +209,8 @@
 title, category_id, owner_id, description, changelog, file
 ```
 
+`title` 最多 200 字，`description` / `changelog` 最多 500 字，`file` 必须有且符合文档模块的类型和 50 MB 限制。文档记录与 v1 在同一事务中创建，文件校验失败不会留下空文档。
+
 ### GET /api/documents/{id}
 
 返回文档详情和当前版本信息。
@@ -247,6 +249,11 @@ changelog, file
 
 下载指定版本文件，返回文件流。
 
+### POST /api/documents/{id}/versions/{version_id}/rollback
+
+仅管理员或文档负责人。把指定历史版本复制成一个新版本，版本号继续递增、历史不被覆盖，
+新版本的 `changelog` 为「回滚到版本 N」。成功返回 201 和新版本对象。
+
 ## 权限映射
 
 | 接口 | 管理员 | 文档负责人 | 普通教师 |
@@ -263,6 +270,7 @@ changelog, file
 | POST /api/documents | 允许 | 403 | 403 |
 | PATCH /api/documents/{id} | 允许 | 403 | 403 |
 | POST /api/documents/{id}/versions | 允许 | 允许（仅本人负责） | 403 |
+| POST /api/documents/{id}/versions/{version_id}/rollback | 允许 | 允许（仅本人负责） | 403 |
 | GET 版本/下载 | 允许 | 允许 | 允许 |
 
 ## 问答接口
@@ -641,9 +649,45 @@ Base URL 仍是 `/api`，问答接口统一挂在 `/api/qa` 前缀下。所有�
 
 `columns` 可以是字符串数组，也可以是 `[{"name": "组号", "type": "text"}]` 对象数组。至少一列。成功返回 201，`data` 除列表字段外还带 `columns`、`rows`。
 
+### POST /api/tables/import
+
+任何已登录用户。使用 `multipart/form-data` 一次导入创建表格，字段为 `name`、`description`、`file`；`name` 留空时使用文件名去掉扩展名。文件规则与覆盖导入相同。成功返回 201：
+
+```json
+{
+  "table": { "id": 2, "name": "scores", "row_count": 120, "version_number": 1 },
+  "version": { "version_number": 1 },
+  "summary": { "sheet_name": "成绩表", "formula_count": 24, "locked_formulas": [] }
+}
+```
+
+解析、公式检查或数据规模校验失败时不会创建表格。
+
 ### GET /api/tables/{id}
 
-任何已登录用户。返回 `columns`、`rows` 与列表字段，并额外带 `can_manage`（当前用户是否为创建者或管理员）。
+任何已登录用户。返回 `columns`、`rows`、`cell_meta` 与列表字段，并额外带 `can_manage`（当前用户是否为创建者或管理员）。
+
+### POST /api/tables/{id}/import
+
+创建者/管理员。使用 `multipart/form-data` 上传字段 `file`，支持 `.xlsx`、`.xls`、`.csv`，读取第一个工作表，最多 2,000 行、30 列、5 MB。成功时整表覆盖，返回：
+
+```json
+{
+  "table": { "id": 1, "row_count": 120, "column_count": 8, "cell_meta": {} },
+  "version": { "version_number": 5, "changelog": "导入 scores.xlsx（成绩表）" },
+  "rollback_version": { "version_number": 4, "changelog": "导入 scores.xlsx 前自动快照" },
+  "summary": {
+    "filename": "scores.xlsx",
+    "sheet_name": "成绩表",
+    "formula_count": 24,
+    "locked_formulas": []
+  }
+}
+```
+
+导入前先保存旧表快照，导入后再保存新版本。解析或公式检查失败时原表不改变。无法计算且没有缓存结果的公式返回 422 `missing_formula_result`；有缓存结果的公式保留原值并锁定。
+
+`.xls` 旧版格式只能稳定取得现有计算结果，不能可靠恢复公式原文；需要继续公式协作时应使用 `.xlsx`。
 
 ### PATCH /api/tables/{id}
 
@@ -661,7 +705,7 @@ Base URL 仍是 `/api`，问答接口统一挂在 `/api/qa` 前缀下。所有�
 { "row_key": "r1", "column_key": "col2", "value": "在线文档协作平台" }
 ```
 
-`value` 作为普通文本保存。成功返回 `{"table": ..., "change": ..., "row": ...}`；值未变化时 `change` 为 `null` 且不写记录。`row_key` 不存在返回 404 `row_not_found`，`column_key` 不存在返回 404 `column_not_found`，值超过 5000 字返回 400 `invalid_value`。
+`value` 以 `=` 开头时按公式保存并自动重算，否则按普通文本保存。成功返回 `{"table": ..., "change": ..., "row": ...}`；值未变化时 `change` 为 `null` 且不写记录。`row_key` 不存在返回 404 `row_not_found`，`column_key` 不存在返回 404 `column_not_found`，值超过 5000 字返回 400 `invalid_value`，公式不支持或无法解析返回 400 `invalid_formula`，修改锁定公式返回 409 `cell_locked`。
 
 ### POST /api/tables/{id}/rows
 
@@ -720,7 +764,7 @@ Base URL 仍是 `/api`，问答接口统一挂在 `/api/qa` 前缀下。所有�
 
 ### GET /api/tables/{id}/versions/{vid}
 
-任何已登录用户。返回版本详情，含完整 `columns`、`rows` 快照。
+任何已登录用户。返回版本详情，含完整 `columns`、`rows`、`cell_meta` 快照。
 
 ### POST /api/tables/{id}/versions/{vid}/rollback
 
@@ -732,7 +776,9 @@ Base URL 仍是 `/api`，问答接口统一挂在 `/api/qa` 前缀下。所有�
 | --- | --- | --- | --- |
 | GET /api/tables | 允许 | 允许 | 允许 |
 | POST /api/tables | 允许 | 允许 | 允许 |
+| POST /api/tables/import | 允许 | 允许 | 允许 |
 | GET /api/tables/{id} | 允许 | 允许 | 允许 |
+| POST /api/tables/{id}/import | 允许 | 允许 | 403 |
 | PATCH /api/tables/{id} | 允许 | 允许 | 403 |
 | DELETE /api/tables/{id} | 允许 | 允许 | 403 |
 | PATCH /api/tables/{id}/cells | 允许 | 允许 | 允许 |

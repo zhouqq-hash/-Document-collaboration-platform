@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>问答管理 · 教学文档协作平台</title>
+    <title>问答讨论 · 教学文档协作平台</title>
     <link rel="stylesheet" href="../documents/styles.css" />
     <link rel="stylesheet" href="qa.css" />
   </head>
@@ -22,17 +22,31 @@
     </header>
 
     <main class="container">
-      <header class="page-head">
-        <h1>问答管理</h1>
-        <p class="subtitle">
-          发起话题讨论，按时间线聚合所有发言，自动汇总话题下的初步统一意见。
-        </p>
+      <header class="module-masthead">
+        <div class="module-identity">
+          <span class="module-seal" aria-hidden="true">议</span>
+          <div>
+            <h1 class="module-title">问答讨论</h1>
+            <p class="module-subtitle">围绕教学文档发起讨论，汇聚意见并形成可追溯的结论。</p>
+          </div>
+        </div>
+        <div class="module-side">
+          <p class="module-note">
+            讨论可以关联到具体文档和版本，方便结论回到原始资料。
+          </p>
+          <div class="module-actions">
+            <a class="btn btn-primary" href="new-topic.html">发起话题</a>
+          </div>
+        </div>
       </header>
 
-      <div class="qa-toolbar">
-        <span class="muted">话题列表</span>
-        <a class="btn btn-primary" href="new-topic.html">发起话题</a>
-      </div>
+      <header class="section-index-head">
+        <div>
+          <h2>话题列表</h2>
+          <p>按分类、状态或关键词查找讨论。</p>
+        </div>
+        <span class="section-count" id="topicCount">正在汇总话题…</span>
+      </header>
 
       <div id="topicFilterHint"></div>
 
@@ -54,23 +68,7 @@
         <button class="btn btn-outline" id="resetFilters" type="button">重置</button>
       </div>
 
-      <div class="card">
-        <table class="table">
-          <thead>
-            <tr>
-              <th>话题</th>
-              <th>分类</th>
-              <th>关联文档</th>
-              <th>发起人</th>
-              <th>状态</th>
-              <th>发言数</th>
-              <th>参与人数</th>
-              <th>最近发言</th>
-            </tr>
-          </thead>
-          <tbody id="topicList"></tbody>
-        </table>
-      </div>
+      <div class="topic-stream" id="topicList" aria-live="polite"></div>
 
       <div class="qa-pager" id="topicPager"></div>
     </main>

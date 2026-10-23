@@ -21,39 +21,138 @@
     </header>
 
     <main class="container">
-      <header class="page-head">
-        <div class="head-actions" style="justify-content: space-between">
+      <header class="module-masthead">
+        <div class="module-identity">
+          <span class="module-seal" aria-hidden="true">表</span>
           <div>
-            <h1>表格协作</h1>
-            <p class="subtitle">多人共同维护表格，行内编辑自动留痕，关键状态可保存快照并一键回滚。</p>
+            <h1 class="module-title">表格协作</h1>
+            <p class="module-subtitle">多人共同维护表格，编辑自动留痕，关键状态可保存快照。</p>
           </div>
-          <button class="btn btn-primary" id="createButton" type="button">新建表格</button>
+        </div>
+        <div class="module-side">
+          <p class="module-note">
+            从空白建立结构，或直接导入 Excel / CSV。
+          </p>
         </div>
       </header>
 
-      <div id="tableList" class="grid-list"></div>
+      <header class="section-index-head">
+        <div>
+          <h2>协作表格</h2>
+          <p>打开表格即可直接编辑单元格，所有修改都会留下记录。</p>
+        </div>
+        <span class="section-count" id="tableCount">正在读取表格…</span>
+      </header>
+
+      <div class="table-grid" id="tableList" aria-label="协作表格列表">
+        <button class="create-table-card" id="createButton" type="button">
+          <span class="create-table-card-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" focusable="false">
+              <path d="M12 5v14M5 12h14" />
+            </svg>
+          </span>
+          <span class="create-table-card-copy">
+            <strong>新建表格</strong>
+            <span>从空白建立，或导入 Excel / CSV。</span>
+          </span>
+        </button>
+        <div class="table-card-list" id="tableCards"></div>
+      </div>
     </main>
 
     <div class="dialog-backdrop" id="createDialog" hidden>
-      <div class="dialog">
-        <h2>新建表格</h2>
-        <form class="form-grid" id="createForm">
+      <div class="dialog create-table-dialog" role="dialog" aria-modal="true" aria-labelledby="createDialogTitle">
+        <div class="create-dialog-head">
           <div>
-            <label for="tableName">表格名称</label>
-            <input id="tableName" name="name" placeholder="例如：2026届毕业设计进度表" required />
+            <p class="dialog-kicker">表格协作</p>
+            <h2 id="createDialogTitle">新建表格</h2>
+            <p>可以定义好列名从空白开始，也可以直接把 Excel / CSV 变成可协作表格。</p>
           </div>
-          <div>
-            <label for="tableDescription">表格说明（可选）</label>
-            <textarea id="tableDescription" name="description" rows="2" placeholder="这张表格用来做什么"></textarea>
+          <button class="dialog-close" id="closeCreateDialog" type="button" aria-label="关闭">×</button>
+        </div>
+
+        <div class="create-mode-tabs" role="tablist" aria-label="新建方式">
+          <button class="create-mode-tab active" id="blankModeTab" data-mode="blank" type="button" role="tab" aria-selected="true">
+            从空白创建
+          </button>
+          <button class="create-mode-tab" id="importModeTab" data-mode="import" type="button" role="tab" aria-selected="false">
+            导入 Excel / CSV
+          </button>
+        </div>
+
+        <form class="form-grid create-table-form" id="createForm" novalidate>
+          <div class="form-field">
+            <label for="tableName">表格名称 <span class="required-mark">必填</span></label>
+            <input
+              id="tableName"
+              name="name"
+              maxlength="120"
+              autocomplete="off"
+              placeholder="例如：2026届毕业设计进度表"
+              required
+            />
+            <p class="form-error" id="tableNameError"></p>
           </div>
-          <div>
-            <label for="tableColumns">列名</label>
-            <input id="tableColumns" name="columns" placeholder="用顿号、逗号或空格分隔，例如：组号、题目、进度" required />
-            <p class="hint">列名之间用「、」「，」「,」或空格分隔。</p>
+
+          <div class="form-field">
+            <label for="tableDescription">表格说明 <span class="optional-mark">可选</span></label>
+            <textarea
+              id="tableDescription"
+              name="description"
+              rows="2"
+              maxlength="500"
+              placeholder="这张表格用来做什么"
+            ></textarea>
           </div>
+
+          <section class="create-mode-panel" id="blankPanel">
+            <div class="panel-heading">
+              <div>
+                <strong>初始列</strong>
+                <p>至少一列；创建后仍可随时新增、重命名或删除。</p>
+              </div>
+              <span class="column-count" id="columnCount">1 列</span>
+            </div>
+            <div class="column-builder" id="columnBuilder"></div>
+            <button class="btn btn-ghost btn-sm" id="addColumnButton" type="button">＋ 添加一列</button>
+            <p class="form-error" id="columnsError"></p>
+          </section>
+
+          <section class="create-mode-panel" id="importPanel" hidden>
+            <div class="panel-heading">
+              <div>
+                <strong>选择文件</strong>
+                <p>读取第一个工作表，创建后直接生成 v1；最多 2,000 行、30 列、5 MB。</p>
+              </div>
+            </div>
+            <input
+              class="file-input"
+              id="importFile"
+              name="file"
+              type="file"
+              accept=".xlsx,.xls,.csv"
+            />
+            <label class="file-drop" id="createFileDrop" for="importFile">
+              <span class="file-drop-icon" aria-hidden="true">↑</span>
+              <strong id="createFileName">点击选择文件，或拖到这里</strong>
+              <span>支持 XLSX、XLS、CSV；常用公式会自动重算</span>
+            </label>
+            <div class="selected-file" id="createSelectedFile" hidden>
+              <div>
+                <strong id="createSelectedFileName"></strong>
+                <span id="createSelectedFileMeta"></span>
+              </div>
+              <button class="btn btn-ghost btn-sm" id="clearCreateFile" type="button">重新选择</button>
+            </div>
+            <p class="file-hint">合并单元格会拆开，边框和颜色不保留；旧版 .xls 仅导入计算结果。</p>
+            <p class="form-error" id="createFileError"></p>
+          </section>
+
+          <div class="form-error create-form-error" id="createFormError" hidden></div>
+
           <div class="dialog-actions">
             <button class="btn btn-ghost" id="cancelCreate" type="button">取消</button>
-            <button class="btn btn-primary" type="submit">创建</button>
+            <button class="btn btn-primary" id="submitCreate" type="submit">创建空白表格</button>
           </div>
         </form>
       </div>
@@ -62,6 +161,11 @@
     <div id="toastBox"></div>
     <script src="tables.js"></script>
     <script>
+      const CREATE_FILE_PATTERN = /\.(xlsx|xls|csv)$/i;
+      let createMode = "blank";
+      let autoFilledName = "";
+      let columnRowSeq = 0;
+
       (async function init() {
         try {
           const user = await getCurrentUser();
@@ -71,47 +175,261 @@
           toast(error.message, "error");
         }
 
-        document.getElementById("createButton").addEventListener("click", () => {
-          document.getElementById("createDialog").hidden = false;
-          document.getElementById("tableName").focus();
+        document.getElementById("createButton").addEventListener("click", openCreateDialog);
+        document.getElementById("closeCreateDialog").addEventListener("click", closeCreateDialog);
+        document.getElementById("cancelCreate").addEventListener("click", closeCreateDialog);
+        document.querySelectorAll(".create-mode-tab").forEach((button) => {
+          button.addEventListener("click", () => setCreateMode(button.dataset.mode));
         });
-        document.getElementById("cancelCreate").addEventListener("click", () => {
-          document.getElementById("createDialog").hidden = true;
+        document.getElementById("addColumnButton").addEventListener("click", () => {
+          addColumnRow("", true);
+        });
+        document.getElementById("clearCreateFile").addEventListener("click", () => {
+          chooseCreateFile(null);
+          document.getElementById("importFile").focus();
         });
         document.getElementById("createForm").addEventListener("submit", onCreate);
+        bindCreateFilePicker();
+        document.addEventListener("keydown", (event) => {
+          if (event.key === "Escape" && !document.getElementById("createDialog").hidden) {
+            closeCreateDialog();
+          }
+        });
       })();
 
-      function parseColumns(text) {
-        return String(text || "")
-          .split(/[，,、\s]+/)
-          .map((item) => item.trim())
+      function openCreateDialog() {
+        document.getElementById("createForm").reset();
+        document.getElementById("createDialog").hidden = false;
+        autoFilledName = "";
+        chooseCreateFile(null);
+        clearCreateErrors();
+        document.getElementById("columnBuilder").innerHTML = "";
+        columnRowSeq = 0;
+        addColumnRow("", false);
+        setCreateMode("blank");
+        document.getElementById("tableName").focus();
+      }
+
+      function closeCreateDialog() {
+        document.getElementById("createDialog").hidden = true;
+      }
+
+      function clearCreateErrors() {
+        document.querySelectorAll("#createForm .form-error").forEach((node) => {
+          node.textContent = "";
+          node.hidden = true;
+        });
+        document.querySelectorAll("#createForm .form-field.invalid").forEach((node) => {
+          node.classList.remove("invalid");
+        });
+      }
+
+      function setCreateError(errorId, message) {
+        const node = document.getElementById(errorId);
+        node.textContent = message;
+        node.hidden = false;
+        node.closest(".form-field, .create-mode-panel")?.classList.add("invalid");
+      }
+
+      function showCreateFormError(message) {
+        const node = document.getElementById("createFormError");
+        node.textContent = message;
+        node.hidden = false;
+        node.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      }
+
+      function setCreateMode(mode) {
+        createMode = mode === "import" ? "import" : "blank";
+        clearCreateErrors();
+        document.querySelectorAll(".create-mode-tab").forEach((button) => {
+          const active = button.dataset.mode === createMode;
+          button.classList.toggle("active", active);
+          button.setAttribute("aria-selected", active ? "true" : "false");
+        });
+        document.getElementById("blankPanel").hidden = createMode !== "blank";
+        document.getElementById("importPanel").hidden = createMode !== "import";
+        document.getElementById("submitCreate").textContent =
+          createMode === "import" ? "导入并创建表格" : "创建空白表格";
+      }
+
+      function addColumnRow(value = "", focus = false) {
+        const builder = document.getElementById("columnBuilder");
+        const row = document.createElement("div");
+        row.className = "column-row";
+        row.dataset.rowId = String(++columnRowSeq);
+        row.innerHTML = `
+          <span class="column-order"></span>
+          <input
+            class="column-name-input"
+            maxlength="80"
+            autocomplete="off"
+            placeholder="输入列名，例如：姓名、项目、进度"
+            value="${escapeHtml(value)}"
+            aria-label="列名"
+          />
+          <button class="column-remove" type="button" aria-label="删除这一列">×</button>
+        `;
+        builder.appendChild(row);
+        row.querySelector(".column-remove").addEventListener("click", () => {
+          if (builder.querySelectorAll(".column-row").length <= 1) {
+            return;
+          }
+          row.remove();
+          updateColumnBuilder();
+        });
+        row.querySelector(".column-name-input").addEventListener("keydown", (event) => {
+          if (event.key === "Enter") {
+            event.preventDefault();
+            if (row === builder.lastElementChild) {
+              addColumnRow("", true);
+            } else {
+              row.nextElementSibling?.querySelector("input")?.focus();
+            }
+          }
+        });
+        updateColumnBuilder();
+        if (focus) {
+          row.querySelector("input").focus();
+        }
+      }
+
+      function updateColumnBuilder() {
+        const rows = [...document.querySelectorAll("#columnBuilder .column-row")];
+        rows.forEach((row, index) => {
+          row.querySelector(".column-order").textContent = String(index + 1).padStart(2, "0");
+          row.querySelector(".column-remove").disabled = rows.length <= 1;
+          row.querySelector("input").placeholder =
+            index === 0
+              ? "例如：姓名"
+              : index === 1
+                ? "例如：项目"
+                : "例如：进度";
+        });
+        document.getElementById("columnCount").textContent = `${rows.length} 列`;
+      }
+
+      function currentColumns() {
+        return [...document.querySelectorAll(".column-name-input")]
+          .map((input) => input.value.trim())
           .filter(Boolean);
       }
 
+      function formatCreateFileSize(bytes) {
+        if (bytes < 1024 * 1024) {
+          return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+        }
+        return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+      }
+
+      function chooseCreateFile(file) {
+        const input = document.getElementById("importFile");
+        const drop = document.getElementById("createFileDrop");
+        const selected = document.getElementById("createSelectedFile");
+        if (!file) {
+          input.value = "";
+          drop.hidden = false;
+          selected.hidden = true;
+          return;
+        }
+        const transfer = new DataTransfer();
+        transfer.items.add(file);
+        input.files = transfer.files;
+        drop.hidden = true;
+        selected.hidden = false;
+        document.getElementById("createSelectedFileName").textContent = file.name;
+        document.getElementById("createSelectedFileMeta").textContent =
+          formatCreateFileSize(file.size);
+
+        const nameInput = document.getElementById("tableName");
+        const fallbackName = file.name.replace(/\.[^.]+$/, "").slice(0, 120);
+        if (!nameInput.value.trim() || nameInput.value === autoFilledName) {
+          nameInput.value = fallbackName;
+          autoFilledName = fallbackName;
+        }
+      }
+
+      function bindCreateFilePicker() {
+        const input = document.getElementById("importFile");
+        const drop = document.getElementById("createFileDrop");
+        input.addEventListener("change", () => {
+          chooseCreateFile(input.files?.[0] || null);
+          document.getElementById("createFileError").textContent = "";
+          document.getElementById("createFileError").hidden = true;
+        });
+        drop.addEventListener("dragover", (event) => {
+          event.preventDefault();
+          drop.classList.add("dragging");
+        });
+        drop.addEventListener("dragleave", () => drop.classList.remove("dragging"));
+        drop.addEventListener("drop", (event) => {
+          event.preventDefault();
+          drop.classList.remove("dragging");
+          const file = event.dataTransfer?.files?.[0];
+          if (file) {
+            chooseCreateFile(file);
+            input.dispatchEvent(new Event("change"));
+          }
+        });
+      }
+
+      function validateCreateFile(file) {
+        if (!file) {
+          return "请选择要导入的文件";
+        }
+        if (!CREATE_FILE_PATTERN.test(file.name)) {
+          return "仅支持 .xlsx、.xls、.csv 文件";
+        }
+        if (file.size > 5 * 1024 * 1024) {
+          return "导入文件不能超过 5 MB";
+        }
+        return "";
+      }
+
       async function renderTables() {
-        const listNode = document.getElementById("tableList");
+        const listNode = document.getElementById("tableCards");
+        const countNode = document.getElementById("tableCount");
         let tables = [];
         try {
           tables = await apiRequest("/api/tables");
         } catch (error) {
+          if (countNode) {
+            countNode.textContent = "表格加载失败";
+          }
           listNode.innerHTML = `<div class="card empty">${escapeHtml(error.message)}</div>`;
           return;
         }
+        if (countNode) {
+          countNode.textContent = tables.length
+            ? `共 ${tables.length} 个表格`
+            : "暂无表格";
+        }
         if (!tables.length) {
-          listNode.innerHTML = `<div class="card empty">还没有表格，点右上角「新建表格」开始协作。</div>`;
+          listNode.innerHTML = "";
           return;
         }
         listNode.innerHTML = tables
           .map(
             (table) => `
-              <a class="card table-card" href="table.html?id=${table.id}">
-                <h2>${escapeHtml(table.name)}</h2>
-                <p>${escapeHtml(table.description || "暂无说明")}</p>
-                <div class="meta">
-                  ${table.column_count} 列 · ${table.row_count} 行 · 版本 ${table.version_number}
-                  · 负责人 ${escapeHtml(table.owner?.name || "")}
-                </div>
-                <div class="meta">更新于 ${formatTime(table.updated_at)}</div>
+              <a class="table-card" href="table.html?id=${table.id}">
+                <span class="table-card-top">
+                  <span class="table-card-shape">${table.column_count} 列 · ${table.row_count} 行</span>
+                  <span class="table-card-version">v${table.version_number}</span>
+                </span>
+                <strong class="table-card-title">${escapeHtml(table.name)}</strong>
+                <span class="table-card-description">${escapeHtml(
+                  table.description || "暂无表格说明"
+                )}</span>
+                <span class="table-card-footer">
+                  <span>
+                    <span class="table-card-label">负责人</span>
+                    <strong>${escapeHtml(table.owner?.name || "未指定")}</strong>
+                  </span>
+                  <span>
+                    <span class="table-card-label">表格结构</span>
+                    <strong>${table.column_count} × ${table.row_count}</strong>
+                  </span>
+                </span>
+                <span class="table-card-time">更新于 ${formatTime(table.updated_at)}</span>
               </a>
             `
           )
@@ -120,24 +438,80 @@
 
       async function onCreate(event) {
         event.preventDefault();
-        const columns = parseColumns(document.getElementById("tableColumns").value);
-        if (!columns.length) {
-          toast("请至少填写一列", "error");
+        clearCreateErrors();
+        const name = document.getElementById("tableName").value.trim();
+        const description = document.getElementById("tableDescription").value.trim();
+        const columns = currentColumns();
+        const file = document.getElementById("importFile").files?.[0] || null;
+        let firstInvalid = null;
+
+        if (!name) {
+          setCreateError("tableNameError", "请填写表格名称");
+          firstInvalid ||= document.getElementById("tableName");
+        }
+        if (createMode === "blank") {
+          const columnInputs = [...document.querySelectorAll(".column-name-input")];
+          if (!columns.length) {
+            setCreateError("columnsError", "请至少填写一个列名");
+            firstInvalid ||= columnInputs[0];
+          } else if (columns.some((item) => item.length > 80)) {
+            setCreateError("columnsError", "列名不能超过 80 个字符");
+            firstInvalid ||= columnInputs[0];
+          } else if (new Set(columns.map((item) => item.toLocaleLowerCase())).size !== columns.length) {
+            setCreateError("columnsError", "列名不能重复");
+            firstInvalid ||= columnInputs[0];
+          }
+        } else {
+          const fileError = validateCreateFile(file);
+          if (fileError) {
+            setCreateError("createFileError", fileError);
+            firstInvalid ||= document.getElementById("importFile");
+          }
+        }
+        if (firstInvalid) {
+          firstInvalid.focus();
           return;
         }
-        const payload = {
-          name: document.getElementById("tableName").value.trim(),
-          description: document.getElementById("tableDescription").value.trim(),
-          columns,
-        };
+
+        const submitButton = document.getElementById("submitCreate");
+        submitButton.disabled = true;
+        submitButton.textContent =
+          createMode === "import" ? "正在导入并创建…" : "正在创建…";
         try {
-          const table = await apiRequest("/api/tables", {
-            method: "POST",
-            body: JSON.stringify(payload),
-          });
+          let table;
+          let importSummary = null;
+          if (createMode === "import") {
+            const formData = new FormData();
+            formData.append("name", name);
+            formData.append("description", description);
+            formData.append("file", file);
+            const result = await apiRequest("/api/tables/import", {
+              method: "POST",
+              body: formData,
+            });
+            table = result.table;
+            importSummary = result.summary;
+          } else {
+            table = await apiRequest("/api/tables", {
+              method: "POST",
+              body: JSON.stringify({ name, description, columns }),
+            });
+          }
+          if (importSummary?.locked_formulas?.length) {
+            const details = importSummary.locked_formulas
+              .slice(0, 5)
+              .map((item) => `${item.cell}：${item.reason}`)
+              .join("\n");
+            window.alert(
+              `有 ${importSummary.locked_formulas.length} 个公式无法在平台内计算，已保留原结果并锁定。\n\n${details}`
+            );
+          }
           window.location.href = `table.html?id=${table.id}`;
         } catch (error) {
-          toast(error.message, "error");
+          showCreateFormError(error.message);
+          submitButton.disabled = false;
+          submitButton.textContent =
+            createMode === "import" ? "导入并创建表格" : "创建空白表格";
         }
       }
     </script>

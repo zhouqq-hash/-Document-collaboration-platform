@@ -138,6 +138,7 @@ const CHANGE_KIND_LABELS = {
   columns_delete: "批量删除列",
   rename: "修改信息",
   rollback: "版本回滚",
+  import: "导入文件",
 };
 
 function changeSummary(change) {
@@ -176,6 +177,12 @@ function changeSummary(change) {
   }
   if (change.kind === "rollback") {
     return `从版本 ${change.detail?.from_version ?? change.old_value} 回滚到版本 ${change.detail?.to_version ?? change.new_value}`;
+  }
+  if (change.kind === "import") {
+    const locked = change.detail?.locked_formula_count || 0;
+    return `导入 ${change.detail?.filename || "文件"}：${change.detail?.row_count ?? 0} 行、${
+      change.detail?.column_count ?? 0
+    } 列${locked ? `，锁定 ${locked} 个公式` : ""}`;
   }
   if (change.kind === "rename") {
     return `名称由「${change.old_value}」改为「${change.new_value}」`;

@@ -641,6 +641,8 @@ class Table(db.Model):
     columns = db.Column(db.JSON, nullable=False, default=list)
     # rows: [{"row_key": "r1", "cells": {"col1": "张三", ...}}, ...]
     rows = db.Column(db.JSON, nullable=False, default=list)
+    # cell_meta: {"r1:col3": {"formula": "=B2*C2", "locked": false, ...}}
+    cell_meta = db.Column(db.JSON, nullable=True, default=dict)
     # 行号自增计数器，保证删除行后新行的 row_key 也不会重复
     row_seq = db.Column(db.Integer, nullable=False, default=0)
     version_number = db.Column(db.Integer, nullable=False, default=1)
@@ -685,6 +687,7 @@ class Table(db.Model):
         if include_grid:
             data["columns"] = self.columns or []
             data["rows"] = self.rows or []
+            data["cell_meta"] = self.cell_meta or {}
         return data
 
 
@@ -725,6 +728,7 @@ class TableVersion(db.Model):
         if include_snapshot:
             data["columns"] = (self.snapshot or {}).get("columns") or []
             data["rows"] = (self.snapshot or {}).get("rows") or []
+            data["cell_meta"] = (self.snapshot or {}).get("cell_meta") or {}
         return data
 
 

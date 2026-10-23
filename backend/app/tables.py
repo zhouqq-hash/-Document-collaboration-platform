@@ -1,8 +1,18 @@
+from pathlib import Path
+
 from flask import Blueprint, request
 from flask_login import current_user, login_required
 
 from . import db
+from .formula_engine import FormulaError, FormulaSyntaxError, UnsupportedFormulaError
 from .models import Table, TableChange, TableVersion, utcnow
+from .table_sheets import (
+    TableImportError,
+    calculate_grid,
+    cell_meta_key,
+    parse_import_file,
+    remap_formula_references,
+)
 from .utils import api_error, api_success
 
 
@@ -19,6 +29,16 @@ def _as_str(value):
     if value is None:
         return ""
     return str(value)
+
+
+def _column_letters(index):
+    number = index + 1
+    letters = ""
+    while number > 0:
+        remainder = (number - 1) % 26
+        letters = chr(65 + remainder) + letters
+        number = (number - 1) // 26
+    return letters
 
 
 def _can_manage(table):
@@ -55,7 +75,11 @@ def _create_version(table, changelog=""):
     version = TableVersion(
         table=table,
         version_number=table.version_number,
-        snapshot={"columns": table.columns or [], "rows": table.rows or []},
+        snapshot={
+            "columns": table.columns or [],
+            "rows": table.rows or [],
+            "cell_meta": table.cell_meta or {},
+        },
         changelog=(changelog or "").strip(),
         editor=current_user,
     )
@@ -83,12 +107,24 @@ def _touch(table):
     table.updated_at = utcnow()
 
 
+def _import_error_response(exc):
+    status = 413 if exc.code == "file_too_large" else 422
+    if exc.code in {"invalid_file_type", "missing_file"}:
+        status = 400
+    if exc.code.endswith("_unavailable"):
+        status = 500
+    return api_error(str(exc), exc.code, status)
+
+
 def _parse_columns(payload):
     raw_columns = payload.get("columns")
     if not isinstance(raw_columns, list) or not raw_columns:
         raise ValueError("至少需要一列")
+    if len(raw_columns) > 30:
+        raise ValueError("最多支持 30 列")
 
     columns = []
+    seen_names = set()
     for index, item in enumerate(raw_columns):
         if isinstance(item, str):
             name = item.strip()
@@ -100,6 +136,9 @@ def _parse_columns(payload):
             raise ValueError("列名不能为空")
         if len(name) > 80:
             raise ValueError("列名过长")
+        if name.casefold() in seen_names:
+            raise ValueError("列名不能重复")
+        seen_names.add(name.casefold())
         columns.append({"key": f"col{index + 1}", "name": name, "type": "text"})
     return columns
 
@@ -143,6 +182,7 @@ def create_table():
         owner=current_user,
         columns=columns,
         rows=[],
+        cell_meta={},
         row_seq=0,
         version_number=0,
     )
@@ -151,6 +191,81 @@ def create_table():
     _create_version(table, "创建表格")
     db.session.commit()
     return api_success(table.to_dict(include_grid=True), status=201)
+
+
+@bp.post("/tables/import")
+@login_required
+def create_table_from_import():
+    upload = request.files.get("file")
+    if upload is None or not upload.filename:
+        return api_error("请选择要导入的文件", "missing_file", 400)
+
+    name = (request.form.get("name") or "").strip()
+    if not name:
+        name = Path(upload.filename).stem.strip() or "导入表格"
+    if len(name) > 120:
+        return api_error("表格名称不能超过 120 个字符", "invalid_name", 400)
+    description = _as_str(request.form.get("description")).strip()
+    if len(description) > 500:
+        return api_error("表格说明不能超过 500 个字符", "invalid_description", 400)
+
+    try:
+        parsed = parse_import_file(upload.filename, upload.read())
+    except TableImportError as exc:
+        return _import_error_response(exc)
+
+    table = Table(
+        name=name,
+        description=description,
+        owner=current_user,
+        columns=parsed["columns"],
+        rows=parsed["rows"],
+        cell_meta=parsed["cell_meta"],
+        row_seq=len(parsed["rows"]),
+        version_number=0,
+    )
+    db.session.add(table)
+    db.session.flush()
+    report = parsed["report"]
+    version = _create_version(
+        table,
+        f"从 {upload.filename} 导入创建表格（{parsed['sheet_name']}）",
+    )
+    _record_change(
+        table,
+        "import",
+        detail={
+            "filename": upload.filename,
+            "extension": parsed["extension"],
+            "sheet_name": parsed["sheet_name"],
+            "row_count": len(table.rows),
+            "column_count": len(table.columns),
+            "formula_count": report["formula_count"],
+            "locked_formula_count": len(report["locked_formulas"]),
+            "created_from_import": True,
+        },
+    )
+    db.session.commit()
+
+    data = table.to_dict(include_grid=True)
+    data["can_manage"] = True
+    return api_success(
+        {
+            "table": data,
+            "version": version.to_dict(),
+            "summary": {
+                "filename": upload.filename,
+                "sheet_name": parsed["sheet_name"],
+                "extension": parsed["extension"],
+                "row_count": len(table.rows),
+                "column_count": len(table.columns),
+                "formula_count": report["formula_count"],
+                "locked_formulas": report["locked_formulas"],
+                "formula_errors": report["formula_errors"],
+            },
+        },
+        status=201,
+    )
 
 
 @bp.get("/tables/<int:table_id>")
@@ -162,6 +277,83 @@ def get_table(table_id):
     data = table.to_dict(include_grid=True)
     data["can_manage"] = _can_manage(table)
     return api_success(data)
+
+
+@bp.post("/tables/<int:table_id>/import")
+@login_required
+def import_table(table_id):
+    table = _get_table_or_404(table_id)
+    if table is None:
+        return api_error("表格不存在", "table_not_found", 404)
+    if not _can_manage(table):
+        return api_error(
+            "只有管理员或表格创建人可以导入文件",
+            "permission_denied",
+            403,
+        )
+
+    upload = request.files.get("file")
+    if upload is None or not upload.filename:
+        return api_error("请选择要导入的文件", "missing_file", 400)
+    try:
+        parsed = parse_import_file(upload.filename, upload.read())
+    except TableImportError as exc:
+        return _import_error_response(exc)
+
+    before_count = len(table.rows or [])
+    before_columns = len(table.columns or [])
+    before_version = _create_version(
+        table,
+        f"导入 {upload.filename} 前自动快照",
+    )
+
+    table.columns = parsed["columns"]
+    table.rows = parsed["rows"]
+    table.cell_meta = parsed["cell_meta"]
+    table.row_seq = len(parsed["rows"])
+    _touch(table)
+    imported_version = _create_version(
+        table,
+        f"导入 {upload.filename}（{parsed['sheet_name']}）",
+    )
+    report = parsed["report"]
+    change = _record_change(
+        table,
+        "import",
+        detail={
+            "filename": upload.filename,
+            "extension": parsed["extension"],
+            "sheet_name": parsed["sheet_name"],
+            "before_rows": before_count,
+            "before_columns": before_columns,
+            "row_count": len(table.rows),
+            "column_count": len(table.columns),
+            "formula_count": report["formula_count"],
+            "locked_formula_count": len(report["locked_formulas"]),
+        },
+    )
+    db.session.commit()
+
+    data = table.to_dict(include_grid=True)
+    data["can_manage"] = True
+    return api_success(
+        {
+            "table": data,
+            "version": imported_version.to_dict(),
+            "rollback_version": before_version.to_dict(),
+            "summary": {
+                "filename": upload.filename,
+                "sheet_name": parsed["sheet_name"],
+                "extension": parsed["extension"],
+                "row_count": len(table.rows),
+                "column_count": len(table.columns),
+                "formula_count": report["formula_count"],
+                "locked_formulas": report["locked_formulas"],
+                "formula_errors": report["formula_errors"],
+            },
+            "change": change.to_dict(),
+        }
+    )
 
 
 @bp.patch("/tables/<int:table_id>")
@@ -242,18 +434,70 @@ def update_cell(table_id):
     if len(value) > MAX_CELL_LENGTH:
         return api_error("单元格内容过长", "invalid_value", 400)
 
-    old_value = row.get("cells", {}).get(column_key, "")
-    if old_value == value:
-        return api_success(
-            {"table": table.to_dict(), "change": None, "row": row}
+    meta_key = cell_meta_key(row_key, column_key)
+    old_meta = dict((table.cell_meta or {}).get(meta_key) or {})
+    if old_meta.get("locked"):
+        return api_error(
+            f"该单元格的公式已锁定：{old_meta.get('warning') or '暂不支持此公式'}",
+            "cell_locked",
+            409,
         )
 
+    old_value = row.get("cells", {}).get(column_key, "")
     rows = [dict(item) for item in (table.rows or [])]
     target = next(item for item in rows if item["row_key"] == row_key)
     cells = dict(target.get("cells") or {})
     cells[column_key] = value
     target["cells"] = cells
-    table.rows = rows
+
+    meta = {key: dict(item) for key, item in (table.cell_meta or {}).items()}
+    if value.startswith("="):
+        meta[meta_key] = {"formula": value, "locked": False}
+    else:
+        meta.pop(meta_key, None)
+
+    try:
+        columns, recalculated_rows, recalculated_meta, report = calculate_grid(
+            table.columns or [], rows, meta
+        )
+    except (UnsupportedFormulaError, FormulaSyntaxError, FormulaError) as exc:
+        return api_error(f"公式无法使用：{exc}", "invalid_formula", 400)
+
+    if report["formula_errors"]:
+        column_index = (table.columns or []).index(column)
+        row_number = next(
+            index
+            for index, item in enumerate(recalculated_rows, start=2)
+            if item["row_key"] == row_key
+        )
+        target_address = f"{_column_letters(column_index)}{row_number}"
+        target_error = next(
+            (
+                item
+                for item in report["formula_errors"]
+                if item.get("cell") == target_address
+            ),
+            None,
+        )
+        if target_error:
+            return api_error(
+                f"公式无法使用：{target_error.get('error')}",
+                "invalid_formula",
+                400,
+            )
+
+    target = next(item for item in recalculated_rows if item["row_key"] == row_key)
+    new_value = (target.get("cells") or {}).get(column_key, "")
+    new_meta = recalculated_meta.get(meta_key) or {}
+    if old_value == new_value and old_meta.get("formula") == new_meta.get("formula"):
+        table.rows = recalculated_rows
+        table.cell_meta = recalculated_meta
+        return api_success(
+            {"table": table.to_dict(include_grid=True), "change": None, "row": target}
+        )
+
+    table.rows = recalculated_rows
+    table.cell_meta = recalculated_meta
     _touch(table)
     change = _record_change(
         table,
@@ -262,12 +506,16 @@ def update_cell(table_id):
         column_key=column_key,
         column_name=column.get("name"),
         old_value=old_value,
-        new_value=value,
+        new_value=new_value,
+        detail={
+            "input_value": value,
+            "formula": new_meta.get("formula"),
+        },
     )
     db.session.commit()
     return api_success(
         {
-            "table": table.to_dict(),
+            "table": table.to_dict(include_grid=True),
             "change": change.to_dict(),
             "row": target,
         }
@@ -298,11 +546,42 @@ def add_row(table_id):
             return api_error("单元格内容过长", "invalid_value", 400)
         cells[key] = text
 
-    table.row_seq = (table.row_seq or 0) + 1
-    row = {"row_key": f"r{table.row_seq}", "cells": cells}
+    next_row_seq = (table.row_seq or 0) + 1
+    row = {"row_key": f"r{next_row_seq}", "cells": cells}
     rows = [dict(item) for item in (table.rows or [])]
     rows.append(row)
+    meta = {key: dict(item) for key, item in (table.cell_meta or {}).items()}
+    for key, value in cells.items():
+        if value.startswith("="):
+            meta[cell_meta_key(row["row_key"], key)] = {
+                "formula": value,
+                "locked": False,
+            }
+    try:
+        columns, rows, meta, report = calculate_grid(table.columns or [], rows, meta)
+    except (UnsupportedFormulaError, FormulaSyntaxError, FormulaError) as exc:
+        return api_error(f"公式无法使用：{exc}", "invalid_formula", 400)
+    if report["formula_errors"]:
+        new_row_number = len(rows) + 1
+        new_row_error = next(
+            (
+                item
+                for item in report["formula_errors"]
+                if item.get("cell", "").endswith(str(new_row_number))
+            ),
+            None,
+        )
+        if new_row_error:
+            return api_error(
+                f"公式无法使用：{new_row_error.get('error')}",
+                "invalid_formula",
+                400,
+            )
+
+    table.row_seq = next_row_seq
     table.rows = rows
+    table.cell_meta = meta
+    row = next(item for item in rows if item["row_key"] == row["row_key"])
     _touch(table)
     change = _record_change(
         table,
@@ -313,7 +592,7 @@ def add_row(table_id):
     db.session.commit()
     return api_success(
         {
-            "table": table.to_dict(),
+            "table": table.to_dict(include_grid=True),
             "change": change.to_dict(),
             "row": row,
         },
@@ -334,8 +613,28 @@ def delete_row(table_id, row_key):
 
     # 删除前先快照，保证删错后能通过版本回滚恢复
     version = _create_version(table, "删除行前自动快照")
+    deleted_row_number = next(
+        index
+        for index, item in enumerate(table.rows or [], start=2)
+        if item["row_key"] == row_key
+    )
     rows = [dict(item) for item in (table.rows or []) if item["row_key"] != row_key]
+    meta = {}
+    for key, item in (table.cell_meta or {}).items():
+        if key.startswith(f"{row_key}:"):
+            continue
+        updated = dict(item)
+        if updated.get("formula"):
+            updated["formula"] = remap_formula_references(
+                updated["formula"], deleted_rows={deleted_row_number}
+            )
+        meta[key] = updated
+    try:
+        columns, rows, meta, _report = calculate_grid(table.columns or [], rows, meta)
+    except FormulaError as exc:
+        return api_error(f"删除后公式无法计算：{exc}", "invalid_formula", 400)
     table.rows = rows
+    table.cell_meta = meta
     _touch(table)
     change = _record_change(
         table,
@@ -346,7 +645,7 @@ def delete_row(table_id, row_key):
     db.session.commit()
     return api_success(
         {
-            "table": table.to_dict(),
+            "table": table.to_dict(include_grid=True),
             "change": change.to_dict(),
             "version_id": version.id,
         }
@@ -377,10 +676,30 @@ def delete_rows(table_id):
 
     version = _create_version(table, f"删除 {len(row_keys)} 行前自动快照")
     keys = set(row_keys)
+    deleted_row_numbers = {
+        index
+        for index, item in enumerate(table.rows or [], start=2)
+        if item["row_key"] in keys
+    }
     rows = [
         dict(item) for item in (table.rows or []) if item["row_key"] not in keys
     ]
+    meta = {}
+    for key, item in (table.cell_meta or {}).items():
+        if key.split(":", 1)[0] in keys:
+            continue
+        updated = dict(item)
+        if updated.get("formula"):
+            updated["formula"] = remap_formula_references(
+                updated["formula"], deleted_rows=deleted_row_numbers
+            )
+        meta[key] = updated
+    try:
+        columns, rows, meta, _report = calculate_grid(table.columns or [], rows, meta)
+    except FormulaError as exc:
+        return api_error(f"删除后公式无法计算：{exc}", "invalid_formula", 400)
     table.rows = rows
+    table.cell_meta = meta
     _touch(table)
     change = _record_change(
         table,
@@ -390,7 +709,7 @@ def delete_rows(table_id):
     db.session.commit()
     return api_success(
         {
-            "table": table.to_dict(),
+            "table": table.to_dict(include_grid=True),
             "change": change.to_dict(),
             "deleted_count": len(row_keys),
             "version_id": version.id,
@@ -417,7 +736,15 @@ def add_column(table_id):
     column = {"key": _next_column_key(table), "name": name, "type": "text"}
     columns = [dict(item) for item in (table.columns or [])]
     columns.append(column)
+    try:
+        columns, rows, meta, _report = calculate_grid(
+            columns, table.rows or [], table.cell_meta or {}
+        )
+    except FormulaError as exc:
+        return api_error(f"新增列后公式无法计算：{exc}", "invalid_formula", 400)
     table.columns = columns
+    table.rows = rows
+    table.cell_meta = meta
     _touch(table)
     _record_change(
         table,
@@ -431,7 +758,7 @@ def add_column(table_id):
     db.session.commit()
     return api_success(
         {
-            "table": table.to_dict(),
+            "table": table.to_dict(include_grid=True),
             "column": column,
         },
         status=201,
@@ -489,7 +816,15 @@ def update_column(table_id, column_key):
         if item["key"] == column_key:
             columns[index] = column
             break
+    try:
+        columns, rows, meta, _report = calculate_grid(
+            columns, table.rows or [], table.cell_meta or {}
+        )
+    except FormulaError as exc:
+        return api_error(f"调整列后公式无法计算：{exc}", "invalid_formula", 400)
     table.columns = columns
+    table.rows = rows
+    table.cell_meta = meta
     _touch(table)
     _record_change(
         table,
@@ -540,8 +875,24 @@ def delete_column(table_id, column_key):
         }
         for row in (table.rows or [])
     ]
+    deleted_column_number = (table.columns or []).index(column) + 1
+    meta = {}
+    for key, item in (table.cell_meta or {}).items():
+        if key.endswith(f":{column_key}"):
+            continue
+        updated = dict(item)
+        if updated.get("formula"):
+            updated["formula"] = remap_formula_references(
+                updated["formula"], deleted_columns={deleted_column_number}
+            )
+        meta[key] = updated
+    try:
+        columns, rows, meta, _report = calculate_grid(columns, rows, meta)
+    except FormulaError as exc:
+        return api_error(f"删除列后公式无法计算：{exc}", "invalid_formula", 400)
     table.columns = columns
     table.rows = rows
+    table.cell_meta = meta
     _touch(table)
     change = _record_change(
         table,
@@ -553,7 +904,7 @@ def delete_column(table_id, column_key):
     db.session.commit()
     return api_success(
         {
-            "table": table.to_dict(),
+            "table": table.to_dict(include_grid=True),
             "change": change.to_dict(),
             "version_id": version.id,
         }
@@ -586,6 +937,11 @@ def delete_columns(table_id):
 
     version = _create_version(table, f"删除 {len(column_keys)} 列前自动快照")
     keys = set(column_keys)
+    deleted_column_numbers = {
+        index
+        for index, item in enumerate(table.columns or [], start=1)
+        if item.get("key") in keys
+    }
     columns = [
         dict(item) for item in (table.columns or []) if item.get("key") not in keys
     ]
@@ -600,8 +956,23 @@ def delete_columns(table_id):
         }
         for row in (table.rows or [])
     ]
+    meta = {}
+    for key, item in (table.cell_meta or {}).items():
+        if key.rsplit(":", 1)[-1] in keys:
+            continue
+        updated = dict(item)
+        if updated.get("formula"):
+            updated["formula"] = remap_formula_references(
+                updated["formula"], deleted_columns=deleted_column_numbers
+            )
+        meta[key] = updated
+    try:
+        columns, rows, meta, _report = calculate_grid(columns, rows, meta)
+    except FormulaError as exc:
+        return api_error(f"删除列后公式无法计算：{exc}", "invalid_formula", 400)
     table.columns = columns
     table.rows = rows
+    table.cell_meta = meta
     _touch(table)
     change = _record_change(
         table,
@@ -615,7 +986,7 @@ def delete_columns(table_id):
     db.session.commit()
     return api_success(
         {
-            "table": table.to_dict(),
+            "table": table.to_dict(include_grid=True),
             "change": change.to_dict(),
             "deleted_count": len(column_keys),
             "version_id": version.id,
@@ -700,6 +1071,16 @@ def rollback_version(table_id, version_id):
     snapshot = version.snapshot or {}
     table.columns = snapshot.get("columns") or []
     table.rows = snapshot.get("rows") or []
+    table.cell_meta = snapshot.get("cell_meta") or {}
+    try:
+        columns, rows, meta, _report = calculate_grid(
+            table.columns, table.rows, table.cell_meta
+        )
+    except FormulaError as exc:
+        return api_error(f"版本中的公式无法计算：{exc}", "invalid_formula", 400)
+    table.columns = columns
+    table.rows = rows
+    table.cell_meta = meta
     _touch(table)
     new_version = _create_version(table, f"回滚到版本 {version.version_number}")
     _record_change(

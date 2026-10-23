@@ -17,10 +17,10 @@
 
 仓库里有两个互相独立的虚拟环境，用途不同，不要混用：
 
-| 环境 | 用途 | 主要依赖 | 对应代码 |
-| --- | --- | --- | --- |
-| `.venv` | 本项目后端 | Flask、Flask-SQLAlchemy、Flask-Migrate、Flask-Login、pytest | `backend/` |
-| `.django-learning` | Django 对照学习 | Django | `djangotutorial/` |
+| 环境                 | 用途          | 主要依赖                                                    | 对应代码              |
+| ------------------ | ----------- | ------------------------------------------------------- | ----------------- |
+| `.venv`            | 本项目后端       | Flask、Flask-SQLAlchemy、Flask-Migrate、Flask-Login、pytest | `backend/`        |
+| `.django-learning` | Django 对照学习 | Django                                                  | `djangotutorial/` |
 
 两个环境的 `include-system-site-packages` 都是 `false`，彼此看不到对方的包，也不会继承 Anaconda base 里的包。
 
@@ -83,11 +83,11 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned
 
 `http://127.0.0.1:5000/` 是原型入口页，展示三个已完成的业务模块：
 
-| 原型 | 入口 | 说明 |
-| --- | --- | --- |
-| 文档管理模块原型 | `http://127.0.0.1:5000/documents/index.html` | 已接入真实 API，必须先启动后端 |
-| 问答管理模块原型 | `http://127.0.0.1:5000/qa/index.html` | 已接入真实 API，话题发起 / 时间线聚合 / 意见汇总 |
-| 表格协作模块原型 | `http://127.0.0.1:5000/table/index.html` | 已接入真实 API，行内编辑 / 修改记录 / 版本回滚 |
+| 原型       | 入口                                           | 说明                            |
+| -------- | -------------------------------------------- | ----------------------------- |
+| 文档管理模块原型 | `http://127.0.0.1:5000/documents/index.html` | 已接入真实 API，必须先启动后端             |
+| 问答管理模块原型 | `http://127.0.0.1:5000/qa/index.html`        | 已接入真实 API，话题发起 / 时间线聚合 / 意见汇总 |
+| 表格协作模块原型 | `http://127.0.0.1:5000/table/index.html`     | 已接入真实 API，行内编辑 / 修改记录 / 版本回滚  |
 
 先启动后端：
 

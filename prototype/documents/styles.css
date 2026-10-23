@@ -287,6 +287,119 @@ code {
   color: var(--muted);
 }
 
+/* 文档管理模块页眉：用档案印签建立模块身份 */
+.module-masthead {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 300px);
+  align-items: end;
+  gap: 36px;
+  margin: 0 0 34px;
+  padding: 8px 0 26px;
+  border-bottom: 1px solid var(--line-strong);
+}
+
+.module-identity {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.module-seal {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 56px;
+  height: 56px;
+  border-radius: 4px;
+  background: var(--cinnabar);
+  color: #fff7ef;
+  font-family: var(--font-display);
+  font-size: 28px;
+  font-weight: 600;
+  line-height: 1;
+  box-shadow: 5px 5px 0 var(--cinnabar-soft);
+}
+
+.module-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 36px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  line-height: 1.15;
+  color: var(--ink-deep);
+}
+
+.module-subtitle {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.module-side {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+}
+
+.module-note {
+  margin: 0;
+  padding-left: 18px;
+  border-left: 1px solid var(--line-strong);
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.8;
+}
+
+.module-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.section-index-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 16px;
+}
+
+.section-index-head h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 21px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--heading);
+}
+
+.section-index-head p {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.section-count {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  gap: 7px;
+  padding-bottom: 2px;
+  color: var(--ink-strong);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.section-count::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 1px;
+  background: var(--cinnabar);
+}
+
 /* --------------------------------------------------------------- 卡片 */
 
 .card {
@@ -527,6 +640,216 @@ td.notice::before {
   background: var(--ink);
 }
 
+/* 文档清单：新建入口与文档内容共用同一套卡片网格 */
+.document-toolbar {
+  margin-bottom: 18px;
+}
+
+.document-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: stretch;
+  gap: 16px;
+}
+
+.document-card-list {
+  display: contents;
+}
+
+.document-card {
+  display: flex;
+  min-width: 0;
+  min-height: 260px;
+  padding: 21px 22px 18px;
+  flex-direction: column;
+  gap: 13px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+  color: var(--text);
+  text-decoration: none;
+  transition:
+    border-color var(--t) var(--ease),
+    box-shadow var(--t) var(--ease),
+    transform var(--t) var(--ease);
+}
+
+.document-card:hover {
+  border-color: var(--ink-tint);
+  box-shadow: var(--shadow-hover);
+  transform: translateY(-2px);
+}
+
+.document-card-top {
+  display: flex;
+  min-height: 26px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.document-card-category {
+  overflow: hidden;
+  color: var(--ink-strong);
+  font-size: 12px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.document-card-title {
+  display: -webkit-box;
+  min-height: 52px;
+  overflow: hidden;
+  color: var(--heading);
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.4;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.document-card-description {
+  display: -webkit-box;
+  min-height: 42px;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.65;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.document-card-footer {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 18px;
+  margin-top: auto;
+  padding-top: 13px;
+  border-top: 1px solid var(--line);
+}
+
+.document-card-footer > span {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.document-card-footer strong {
+  overflow: hidden;
+  color: var(--ink-deep);
+  font-size: 13px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.document-card-label,
+.document-card-time {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.document-card-time {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.document-grid-empty {
+  display: flex;
+  min-height: 160px;
+  grid-column: 1 / -1;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--muted);
+  text-align: center;
+}
+
+.create-document-card {
+  display: flex;
+  width: 100%;
+  min-height: 260px;
+  margin: 0;
+  padding: 30px 24px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  border: 1px dashed var(--line-strong);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--ink-deep);
+  text-align: center;
+  text-decoration: none;
+  transition:
+    border-color var(--t) var(--ease),
+    background-color var(--t) var(--ease),
+    box-shadow var(--t) var(--ease),
+    transform var(--t) var(--ease);
+}
+
+.create-document-card:hover {
+  border-color: var(--ink);
+  background-color: rgba(237, 242, 246, 0.52);
+  box-shadow: var(--shadow-hover);
+  transform: translateY(-2px);
+}
+
+.create-document-card:focus-visible {
+  border-color: var(--ink);
+  outline-offset: 4px;
+}
+
+.create-document-card-icon {
+  display: inline-flex;
+  width: 58px;
+  height: 58px;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  border-radius: 50%;
+  background: var(--ink-soft);
+  color: var(--ink-deep);
+}
+
+.create-document-card-icon svg {
+  width: 28px;
+  height: 28px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+}
+
+.create-document-card-copy {
+  display: grid;
+  gap: 5px;
+}
+
+.create-document-card-copy strong {
+  font-family: var(--font-display);
+  font-size: 21px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.create-document-card-copy span {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+#createDocumentLink[hidden] {
+  display: none !important;
+}
+
 /* --------------------------------------------------------------- 按钮 */
 
 .btn {
@@ -662,6 +985,320 @@ td.notice::before {
   padding: 9px 12px;
   background: var(--surface-2);
   cursor: pointer;
+}
+
+/* ---------------------------------------------------- 新建文档流程 */
+
+.create-document-page {
+  max-width: 1040px;
+}
+
+.create-page-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.page-kicker {
+  margin: 0 0 7px;
+  color: var(--cinnabar);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.create-document-form {
+  display: grid;
+  gap: 18px;
+}
+
+.create-document-form[hidden] {
+  display: none;
+}
+
+.form-section {
+  padding: 24px 28px 28px;
+}
+
+.form-section-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.form-section-head h2 {
+  margin: 0 0 3px;
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--heading);
+}
+
+.form-section-head p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.step-number {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--ink-tint);
+  border-radius: 50%;
+  background: var(--ink-soft);
+  color: var(--ink-deep);
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.form-grid-two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 20px;
+}
+
+.form-field {
+  min-width: 0;
+}
+
+.form-field-wide {
+  grid-column: 1 / -1;
+}
+
+.required-mark,
+.optional-mark {
+  margin-left: 5px;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.required-mark {
+  color: var(--cinnabar);
+}
+
+.optional-mark {
+  color: var(--muted);
+}
+
+.field-hint,
+.field-error {
+  margin: 6px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.field-hint {
+  color: var(--muted);
+  text-align: right;
+}
+
+.field-error {
+  display: none;
+  color: var(--cinnabar);
+}
+
+.field-error:not(:empty) {
+  display: block;
+}
+
+.form-field.invalid input,
+.form-field.invalid textarea,
+.form-field.invalid .search-select-trigger {
+  border-color: var(--cinnabar);
+  box-shadow: 0 0 0 3px rgba(177, 58, 44, 0.1);
+}
+
+.file-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.file-drop {
+  display: flex !important;
+  min-height: 158px;
+  margin: 0 !important;
+  padding: 22px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius);
+  background:
+    linear-gradient(180deg, rgba(237, 242, 246, 0.65), rgba(255, 255, 255, 0.4)),
+    var(--surface);
+  color: var(--muted);
+  text-align: center;
+  cursor: pointer;
+  transition: border-color var(--t-fast) var(--ease),
+    background-color var(--t-fast) var(--ease);
+}
+
+.file-drop:hover,
+.file-drop.dragging {
+  border-color: var(--ink);
+  background-color: var(--ink-soft);
+}
+
+.file-drop[hidden] {
+  display: none !important;
+}
+
+.file-drop strong {
+  color: var(--ink-deep);
+  font-size: 15px;
+}
+
+.file-drop span:last-child {
+  font-size: 12px;
+}
+
+.file-drop-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--ink);
+  color: #fff;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.selected-file {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+
+.selected-file[hidden] {
+  display: none;
+}
+
+.selected-file strong,
+.selected-file span {
+  display: block;
+}
+
+.selected-file strong {
+  color: var(--heading);
+  font-size: 14px;
+  word-break: break-all;
+}
+
+.selected-file span {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.advanced-options {
+  margin-top: 18px;
+  border-top: 1px solid var(--line);
+}
+
+.advanced-options summary {
+  padding: 14px 0 0;
+  color: var(--ink-strong);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.advanced-options[open] summary {
+  margin-bottom: 14px;
+}
+
+.create-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 2px 0 12px;
+}
+
+@media (max-width: 960px) {
+  .document-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .module-masthead {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+
+  .module-seal {
+    width: 48px;
+    height: 48px;
+    font-size: 24px;
+  }
+
+  .module-title {
+    font-size: 30px;
+  }
+
+  .module-note {
+    padding: 14px 0 0;
+    border-top: 1px solid var(--line);
+    border-left: 0;
+  }
+
+  .section-index-head {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .create-page-head,
+  .selected-file {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .form-grid-two {
+    grid-template-columns: 1fr;
+  }
+
+  .form-field-wide {
+    grid-column: auto;
+  }
+
+  .form-section {
+    padding: 20px;
+  }
+
+  .create-form-actions {
+    flex-direction: column-reverse;
+  }
+
+  .create-form-actions .btn {
+    width: 100%;
+  }
+
+  .document-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* ----------------------------------------------------- 可搜索下拉选择 */

@@ -20,11 +20,31 @@
       <div id="topbar"></div>
     </header>
     <main class="container">
-      <header class="page-head">
-        <h1 class="page-title">文档分类</h1>
-        <p class="page-subtitle">选择一个分类查看其中的文档。</p>
+      <header class="module-masthead">
+        <div class="module-identity">
+          <span class="module-seal" aria-hidden="true">文</span>
+          <div>
+            <h1 class="module-title">文档管理</h1>
+            <p class="module-subtitle">统一维护教学文档、版本与负责人。</p>
+          </div>
+        </div>
+        <div class="module-side">
+          <p class="module-note">
+            先按分类定位资料，再进入文档查看当前版本和历史记录。
+          </p>
+        </div>
       </header>
-      <div id="categoryList" class="grid"></div>
+
+      <section class="category-index" aria-labelledby="categoryHeading">
+        <header class="section-index-head">
+          <div>
+            <h2 id="categoryHeading">文档分类</h2>
+            <p>选择一个分类查看其中的文档。</p>
+          </div>
+          <span class="section-count" id="categoryCount">正在整理分类…</span>
+        </header>
+        <div id="categoryList" class="grid"></div>
+      </section>
     </main>
     <script src="app.js"></script>
   </body>

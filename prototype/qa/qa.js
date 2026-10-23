@@ -282,17 +282,51 @@ function showPageMessage(containerId, message, isError = false) {
 }
 
 function renderTopicRow(topic) {
+  const creator = escapeHtml(topic.creator?.name || "未知");
+  const document = topic.document
+    ? `<a class="topic-document-link" href="../documents/document-detail.html?id=${
+        topic.document.id
+      }">${escapeHtml(topic.document.title)}${
+        topic.version ? ` · v${topic.version.version_number}` : ""
+      }</a>`
+    : "";
+
   return `
-    <tr>
-      <td><a href="topic.html?id=${topic.id}">${escapeHtml(topic.title)}</a></td>
-      <td>${categoryBadge(topic.category)}</td>
-      <td>${documentCell(topic)}</td>
-      <td>${escapeHtml(topic.creator.name)}</td>
-      <td>${statusBadge(topic.status)}</td>
-      <td>${topic.statement_count}</td>
-      <td>${topic.speaker_count}</td>
-      <td>${formatTime(topic.latest_statement_at || topic.updated_at)}</td>
-    </tr>
+    <article class="topic-row">
+      <div class="topic-row-main">
+        <div class="topic-row-tags">
+          ${statusBadge(topic.status)}
+          ${categoryBadge(topic.category)}
+          <span class="topic-row-creator">发起人 ${creator}</span>
+        </div>
+        <h3 class="topic-row-title">
+          <a href="topic.html?id=${topic.id}">${escapeHtml(topic.title)}</a>
+        </h3>
+        <div class="topic-row-document">
+          ${
+            document
+              ? `<span class="topic-row-label">关联文档</span>${document}`
+              : '<span class="topic-document-empty">未关联文档</span>'
+          }
+        </div>
+      </div>
+      <div class="topic-row-engagement" aria-label="讨论参与情况">
+        <span class="topic-stat">
+          <strong>${topic.statement_count}</strong>
+          <span>条发言</span>
+        </span>
+        <span class="topic-stat">
+          <strong>${topic.speaker_count}</strong>
+          <span>人参与</span>
+        </span>
+      </div>
+      <div class="topic-row-activity">
+        <span class="topic-row-label">最近发言</span>
+        <time datetime="${escapeHtml(
+          topic.latest_statement_at || topic.updated_at || ""
+        )}">${formatTime(topic.latest_statement_at || topic.updated_at)}</time>
+      </div>
+    </article>
   `;
 }
 
@@ -391,15 +425,18 @@ async function initTopicList() {
   }
 
   async function load() {
-    container.innerHTML =
-      '<tr><td colspan="8" class="muted">加载中…</td></tr>';
+    container.innerHTML = '<div class="topic-stream-state">加载中…</div>';
     try {
       const result = await apiRequest(`/api/qa/topics${buildQuery()}`);
       const topics = result.items || [];
       page = result.page || page;
+      const countNode = document.getElementById("topicCount");
+      if (countNode) {
+        countNode.textContent = `共 ${result.total || 0} 个话题`;
+      }
       container.innerHTML = topics.length
         ? topics.map(renderTopicRow).join("")
-        : '<tr><td colspan="8" class="muted">没有符合条件的话题。</td></tr>';
+        : '<div class="topic-stream-state">没有符合条件的话题。</div>';
       // 页码越界（比如筛选后页数变少）时退回最后一页
       if (!topics.length && result.total > 0) {
         const lastPage = Math.max(1, result.total_pages || 1);
@@ -410,9 +447,13 @@ async function initTopicList() {
       }
       renderPager(result);
     } catch (error) {
-      container.innerHTML = `<tr><td colspan="8" class="notice">${escapeHtml(
+      const countNode = document.getElementById("topicCount");
+      if (countNode) {
+        countNode.textContent = "话题加载失败";
+      }
+      container.innerHTML = `<div class="topic-stream-state notice">${escapeHtml(
         error.message
-      )}</td></tr>`;
+      )}</div>`;
       if (pagerContainer) {
         pagerContainer.innerHTML = "";
       }
