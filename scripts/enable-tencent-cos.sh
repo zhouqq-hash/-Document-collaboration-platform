@@ -38,6 +38,11 @@ if [ -z "$cos_bucket" ] || [ -z "$cos_secret_id" ] || [ -z "$cos_secret_key" ]; 
   echo "COS 存储桶、SecretId 和 SecretKey 不能为空。" >&2
   exit 1
 fi
+if [[ ! "$cos_bucket" =~ ^[a-z0-9][a-z0-9-]+-[0-9]+$ ]]; then
+  echo "COS 桶名格式不正确，应为小写字母、数字、连字符并包含 APPID。" >&2
+  echo "例如：teaching-doc-collab-1493204906" >&2
+  exit 1
+fi
 case "$cos_region" in
   ap-[a-z0-9-]*)
     ;;
