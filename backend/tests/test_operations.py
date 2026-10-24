@@ -75,6 +75,30 @@ def test_cos_storage_lists_all_pages_and_saves_bytes():
     }
 
 
+def test_cos_storage_probe_uses_list_permission():
+    class Client:
+        def __init__(self):
+            self.params = None
+
+        def list_objects(self, **kwargs):
+            self.params = kwargs
+            return {"Contents": [], "IsTruncated": "false"}
+
+    storage = object.__new__(CosStorage)
+    storage.bucket = "bucket-1250000000"
+    storage.region = "ap-guangzhou"
+    storage.prefix = "doc-collab"
+    storage.client = Client()
+
+    storage.probe()
+
+    assert storage.client.params == {
+        "Bucket": "bucket-1250000000",
+        "MaxKeys": 1,
+        "Prefix": "doc-collab/",
+    }
+
+
 def test_readiness_reports_database_and_storage(client):
     response = client.get("/api/ready")
 

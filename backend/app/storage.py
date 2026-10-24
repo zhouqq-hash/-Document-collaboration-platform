@@ -132,8 +132,11 @@ class CosStorage:
         )
 
     def probe(self):
-        """Check bucket credentials without changing object data."""
-        self.client.head_bucket(Bucket=self.bucket)
+        """Check bucket credentials with the same list permission backups need."""
+        params = {"Bucket": self.bucket, "MaxKeys": 1}
+        if self.prefix:
+            params["Prefix"] = f"{self.prefix}/"
+        self.client.list_objects(**params)
 
     def iter_keys(self):
         marker = ""

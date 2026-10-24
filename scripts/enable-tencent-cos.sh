@@ -105,7 +105,7 @@ echo "构建包含 COS SDK 的新镜像..."
 docker compose build app
 
 echo "验证 COS 凭据和存储桶..."
-docker compose run --rm app python -m flask --app backend/run.py doctor
+docker compose run --rm app python -m flask --app backend/run.py doctor --strict
 
 echo "停止 Web 服务并迁移本地附件..."
 docker compose stop caddy app
