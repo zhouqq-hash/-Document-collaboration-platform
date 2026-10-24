@@ -159,6 +159,24 @@ def test_frontend_javascript_is_served_with_executable_mime_type(client):
     assert response.mimetype == "text/javascript"
 
 
+def test_qa_brand_links_return_to_workspace(client):
+    qa_pages = [
+        "index.html",
+        "topic.html",
+        "new-topic.html",
+        "notifications.html",
+        "reports.html",
+        "qa-categories.html",
+    ]
+
+    for page in qa_pages:
+        response = client.get(f"/qa/{page}")
+        assert response.status_code == 200
+        assert '<a class="brand" href="/" aria-label="返回工作台">' in (
+            response.get_data(as_text=True)
+        )
+
+
 def test_doctor_blocks_public_deployment_unsafe_defaults(app):
     app.config.update(
         {
