@@ -258,10 +258,24 @@ Compose 配置中固定关闭。
 
 ```bash
 cd ~/doc-collab
-git pull --ff-only
-docker compose up -d --build
-docker compose exec -T app python -m flask --app backend/run.py doctor --strict
+bash scripts/deploy-update.sh
 ```
+
+该脚本会先创建备份，再执行 `git pull --ff-only`、重建应用、等待
+`/api/ready` 并运行 `doctor --strict`。如果服务器仓库有本地修改，脚本会停止，
+防止手工修改与 GitHub 代码混在一起。
+
+正常开发流程始终是：
+
+```text
+本地修改
+  -> 本地测试
+  -> git commit + git push origin main
+  -> 服务器执行 scripts/deploy-update.sh
+```
+
+不要把服务器当作代码编辑环境。`.env` 和 `app_data` 持久卷不属于 Git，更新不会覆盖
+服务器密钥、数据库、附件备份或 COS 配置。
 
 查看日志：
 
