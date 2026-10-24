@@ -1609,26 +1609,40 @@ async function initDocumentAiPanels(doc, canReview) {
     return review.error || reviewStatusLabel(review);
   }
 
-  function promptHumanPassConfirmation(review) {
+  function promptHumanDecisionConfirmation(review, decision, note = "") {
     const verdict = review.result?.verdict || review.verdict || "unknown";
     const summary = review.result?.checklist_summary || {};
     const attentionCount =
       Number(summary.fail || 0) + Number(summary.unknown || 0);
-    const isManualFallback = Boolean(review.manual_fallback_available);
+    const isReturn = decision === "return";
+    const isManualFallback =
+      !isReturn && Boolean(review.manual_fallback_available);
+    const notePreview =
+      note.length > 500 ? `${note.slice(0, 500)}…` : note;
 
     return new Promise((resolve) => {
       const returnFocusTo = document.activeElement;
       const modal = document.createElement("div");
       modal.className = "confirm-modal";
       modal.innerHTML = `
-        <section class="confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="humanPassTitle" aria-describedby="humanPassDescription">
-          <div class="confirm-dialog-kicker">${isManualFallback ? "人工兜底确认" : "人工确认"}</div>
-          <h2 id="humanPassTitle">${isManualFallback ? "确认已完成人工核验？" : "确认通过这份文档？"}</h2>
-          <p id="humanPassDescription">
+        <section class="confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="humanDecisionTitle" aria-describedby="humanDecisionDescription">
+          <div class="confirm-dialog-kicker">${
+            isReturn ? "退回修改" : isManualFallback ? "人工兜底确认" : "人工确认"
+          }</div>
+          <h2 id="humanDecisionTitle">${
+            isReturn
+              ? "确认退回这份文档？"
+              : isManualFallback
+                ? "确认已完成人工核验？"
+                : "确认通过这份文档？"
+          }</h2>
+          <p id="humanDecisionDescription">
             ${
-              isManualFallback
-                ? "本次 AI 预审未完成。通过后将记录为人工兜底确认，并保留 AI 失败原因、确认账号和时间。"
-                : "通过后，当前版本将标记为“已通过”，并记录确认账号、时间和备注。请先核对检查清单、原文依据和需要处理的事项。"
+              isReturn
+                ? "退回后，当前版本将标记为“待修改”，负责人需要按退回意见上传新版本。退回记录不会被删除。"
+                : isManualFallback
+                  ? "本次 AI 预审未完成。通过后将记录为人工兜底确认，并保留 AI 失败原因、确认账号和时间。"
+                  : "通过后，当前版本将标记为“已通过”，并记录确认账号、时间和备注。请先核对检查清单、原文依据和需要处理的事项。"
             }
           </p>
           <div class="confirm-dialog-verdict ${verdictClass(verdict)}">
@@ -1638,15 +1652,21 @@ async function initDocumentAiPanels(doc, canReview) {
             )}</strong>
           </div>
           ${
-            isManualFallback
-              ? '<p class="confirm-dialog-warning">人工兜底不会修改或伪造 AI 结果，失败原因会保留在预审记录与日志中。</p>'
-              : attentionCount
-              ? `<p class="confirm-dialog-warning">当前仍有 ${attentionCount} 项不通过或待确认，请确认已完成人工核验。</p>`
-              : ""
+            isReturn
+              ? `<div class="confirm-dialog-warning"><strong>退回原因</strong><p>${escapeHtml(notePreview)}</p></div>`
+              : isManualFallback
+                ? '<p class="confirm-dialog-warning">人工兜底不会修改或伪造 AI 结果，失败原因会保留在预审记录与日志中。</p>'
+                : attentionCount
+                  ? `<p class="confirm-dialog-warning">当前仍有 ${attentionCount} 项不通过或待确认，请确认已完成人工核验。</p>`
+                  : ""
           }
           <div class="confirm-dialog-actions">
-            <button class="btn btn-outline" type="button" data-confirm-cancel>再检查一下</button>
-            <button class="btn btn-primary" type="button" data-confirm-pass>确认通过</button>
+            <button class="btn btn-outline" type="button" data-confirm-cancel>${
+              isReturn ? "继续编辑" : "再检查一下"
+            }</button>
+            <button class="btn ${isReturn ? "btn-warning" : "btn-primary"}" type="button" data-confirm-action>${
+              isReturn ? "确认退回" : "确认通过"
+            }</button>
           </div>
         </section>
       `;
@@ -1676,7 +1696,7 @@ async function initDocumentAiPanels(doc, canReview) {
         .querySelector("[data-confirm-cancel]")
         .addEventListener("click", () => close(false));
       modal
-        .querySelector("[data-confirm-pass]")
+        .querySelector("[data-confirm-action]")
         .addEventListener("click", () => close(true));
 
       document.body.classList.add("has-confirm-modal");
@@ -1733,8 +1753,7 @@ async function initDocumentAiPanels(doc, canReview) {
             return;
           }
           if (
-            decision === "pass" &&
-            !(await promptHumanPassConfirmation(review))
+            !(await promptHumanDecisionConfirmation(review, decision, note))
           ) {
             return;
           }

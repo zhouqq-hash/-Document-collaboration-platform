@@ -62,11 +62,18 @@ with sync_playwright() as playwright:
         path="testdata/ai-fallback-before.png", full_page=True
     )
 
-    page.locator("#humanReviewNote").fill(
-        "已逐项对照教学大纲模板完成人工核验"
-    )
+    page.locator("#humanReviewNote").fill("测试退回确认弹窗")
+    page.locator('[data-human-decision="return"]').click()
+    page.locator("[data-confirm-action]").wait_for()
+    assert page.locator(".confirm-dialog h2").inner_text() == "确认退回这份文档？"
+    assert page.locator("[data-confirm-action]").inner_text() == "确认退回"
+    page.screenshot(path="testdata/ai-return-confirm.png", full_page=True)
+    page.locator("[data-confirm-cancel]").click()
+    assert page.locator(".confirm-dialog").count() == 0
+
+    page.locator("#humanReviewNote").fill("已逐项对照教学大纲模板完成人工核验")
     page.locator('[data-human-decision="pass"]').click()
-    page.locator("[data-confirm-pass]").click()
+    page.locator("[data-confirm-action]").click()
     page.get_by_text("已通过", exact=True).first.wait_for()
     page.screenshot(
         path="testdata/ai-fallback-after.png", full_page=True
