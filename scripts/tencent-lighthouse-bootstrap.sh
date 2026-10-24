@@ -51,7 +51,7 @@ if [ -z "${APP_DOMAIN:-}" ] || [ -z "${ACME_EMAIL:-}" ]; then
   echo ".env 缺少 APP_DOMAIN 或 ACME_EMAIL。" >&2
   exit 1
 fi
-if [ "${#SECRET_KEY:-0}" -lt 32 ]; then
+if [ -z "${SECRET_KEY:-}" ] || [ "${#SECRET_KEY}" -lt 32 ]; then
   echo "SECRET_KEY 至少需要 32 个字符。" >&2
   exit 1
 fi
