@@ -16,6 +16,8 @@ fi
 read -r -p "COS 存储桶名称（包含 APPID）: " cos_bucket
 read -r -p "COS 地域 [ap-hongkong]: " cos_region
 cos_region="${cos_region:-ap-hongkong}"
+read -r -p "COS 对象前缀 [doc-collab]: " cos_key_prefix
+cos_key_prefix="${cos_key_prefix:-doc-collab}"
 read -r -s -p "COS SecretId: " cos_secret_id
 echo
 read -r -s -p "COS SecretKey: " cos_secret_key
@@ -30,6 +32,7 @@ export COS_BUCKET="$cos_bucket"
 export COS_REGION="$cos_region"
 export COS_SECRET_ID="$cos_secret_id"
 export COS_SECRET_KEY="$cos_secret_key"
+export COS_KEY_PREFIX="$cos_key_prefix"
 
 python3 - <<'PY'
 import os
@@ -41,6 +44,7 @@ updates = {
     "STORAGE_BACKEND": "cos",
     "COS_BUCKET": os.environ["COS_BUCKET"],
     "COS_REGION": os.environ["COS_REGION"],
+    "COS_KEY_PREFIX": os.environ["COS_KEY_PREFIX"],
     "COS_SECRET_ID": os.environ["COS_SECRET_ID"],
     "COS_SECRET_KEY": os.environ["COS_SECRET_KEY"],
 }
@@ -68,7 +72,7 @@ temporary.chmod(0o600)
 temporary.replace(path)
 PY
 
-unset COS_SECRET_ID COS_SECRET_KEY COS_BUCKET COS_REGION
+unset COS_SECRET_ID COS_SECRET_KEY COS_BUCKET COS_REGION COS_KEY_PREFIX
 chmod 600 .env
 docker compose config --quiet
 

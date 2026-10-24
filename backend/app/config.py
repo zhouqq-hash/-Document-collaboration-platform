@@ -101,6 +101,7 @@ class Config:
     COS_SECRET_KEY = os.environ.get("COS_SECRET_KEY")
     COS_REGION = os.environ.get("COS_REGION")
     COS_BUCKET = os.environ.get("COS_BUCKET")
+    COS_KEY_PREFIX = os.environ.get("COS_KEY_PREFIX", "").strip().strip("/")
     # 硅基流动 SiliconFlow（OpenAI 兼容接口）：AI 问答和自动预审都走这里
     COSMOS_API_BASE = os.environ.get(
         "COSMOS_API_BASE", "https://api.siliconflow.cn/v1"

@@ -23,6 +23,7 @@ if [ ! -f .env ]; then
   fi
   cos_bucket="${COS_BUCKET:-}"
   cos_region="${COS_REGION:-ap-hongkong}"
+  cos_key_prefix="${COS_KEY_PREFIX:-doc-collab}"
   cos_secret_id="${COS_SECRET_ID:-}"
   cos_secret_key="${COS_SECRET_KEY:-}"
   if [ -z "$cos_bucket" ]; then
@@ -62,6 +63,7 @@ if [ ! -f .env ]; then
     printf 'COS_SECRET_KEY=%s\n' "$cos_secret_key"
     printf 'COS_REGION=%s\n' "$cos_region"
     printf 'COS_BUCKET=%s\n' "$cos_bucket"
+    printf 'COS_KEY_PREFIX=%s\n' "$cos_key_prefix"
   } > .env
   echo "已生成 .env（权限 600）。"
 fi

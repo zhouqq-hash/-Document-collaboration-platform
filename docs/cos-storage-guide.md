@@ -22,9 +22,26 @@
 doc-collab-1250000000
 ```
 
+已有专用桶可以直接复用。应用默认只管理 `doc-collab/` 前缀，不会列出或覆盖桶内
+其他前缀的数据。例如复用广州桶时可填写：
+
+```text
+COS_REGION=ap-guangzhou
+COS_BUCKET=teaching-doc-collab-1493204906
+COS_KEY_PREFIX=doc-collab
+```
+
 ### 2. 创建最小权限密钥
 
-在腾讯云 CAM 创建 API 密钥，最好使用仅授权该 COS 桶的子用户，不要使用主账号长期密钥。
+腾讯云 **CAM 就是“访问管理”**：
+
+```text
+https://console.cloud.tencent.com/cam
+```
+
+进入 **用户 → 用户列表 → 新建用户 → 自定义创建**，访问方式选择“编程访问”，
+然后创建 API 密钥。为该子用户授予 COS 数据读写权限，最好把资源限制到此项目专用的桶。
+不要使用主账号长期密钥。
 
 ### 3. 在服务器启用并迁移
 
@@ -78,7 +95,7 @@ python -m pip install -r backend\requirements-cos.txt
 
 ## 二、配置环境变量
 
-项目读取下面 5 个环境变量。`STORAGE_BACKEND` 默认是 `local`，改成 `cos` 才启用 COS。
+项目读取下面 6 个环境变量。Docker Compose 默认使用 COS；本地开发不设置时仍使用本地存储。
 
 | 环境变量 | 含义 | 示例值 |
 | --- | --- | --- |
@@ -87,6 +104,7 @@ python -m pip install -r backend\requirements-cos.txt
 | `COS_SECRET_KEY` | 密钥 Key | `xxxxxxxx` |
 | `COS_REGION` | 桶所在地域 | `ap-guangzhou` |
 | `COS_BUCKET` | 桶名 | `your-name-1250000000` |
+| `COS_KEY_PREFIX` | 应用对象前缀 | `doc-collab` |
 
 ### PowerShell 临时设置（只对当前窗口生效）
 
@@ -96,6 +114,7 @@ $env:COS_SECRET_ID = "你的SecretId"
 $env:COS_SECRET_KEY = "你的SecretKey"
 $env:COS_REGION = "ap-guangzhou"
 $env:COS_BUCKET = "你的桶名"
+$env:COS_KEY_PREFIX = "doc-collab"
 ```
 
 ### Windows 永久设置（对所有新窗口生效）
@@ -106,6 +125,7 @@ $env:COS_BUCKET = "你的桶名"
 [Environment]::SetEnvironmentVariable("COS_SECRET_KEY", "你的SecretKey", "User")
 [Environment]::SetEnvironmentVariable("COS_REGION", "ap-guangzhou", "User")
 [Environment]::SetEnvironmentVariable("COS_BUCKET", "你的桶名", "User")
+[Environment]::SetEnvironmentVariable("COS_KEY_PREFIX", "doc-collab", "User")
 ```
 
 设置永久变量后需要**重开终端**才会生效。

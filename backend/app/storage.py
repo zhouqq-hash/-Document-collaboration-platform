@@ -72,7 +72,7 @@ class LocalStorage:
 class CosStorage:
     """把文件保存到腾讯云 COS 对象存储。"""
 
-    def __init__(self, secret_id, secret_key, region, bucket):
+    def __init__(self, secret_id, secret_key, region, bucket, prefix=""):
         try:
             from qcloud_cos import CosConfig, CosS3Client
         except ImportError as exc:
@@ -87,6 +87,17 @@ class CosStorage:
         self.client = CosS3Client(config)
         self.bucket = bucket
         self.region = region
+        self.prefix = (prefix or "").strip().strip("/")
+
+    def _object_key(self, key):
+        key = key.lstrip("/")
+        return f"{self.prefix}/{key}" if self.prefix else key
+
+    def _logical_key(self, key):
+        if not self.prefix:
+            return key
+        prefix = f"{self.prefix}/"
+        return key[len(prefix) :] if key.startswith(prefix) else None
 
     def save(self, file_storage, key):
         self.save_bytes(file_storage.read(), key)
@@ -95,26 +106,30 @@ class CosStorage:
         self.client.put_object(
             Bucket=self.bucket,
             Body=data,
-            Key=key,
+            Key=self._object_key(key),
         )
 
     def copy(self, src_key, dst_key):
         self.client.copy_object(
             Bucket=self.bucket,
-            Key=dst_key,
+            Key=self._object_key(dst_key),
             CopySource={
                 "Bucket": self.bucket,
-                "Key": src_key,
+                "Key": self._object_key(src_key),
                 "Region": self.region,
             },
         )
 
     def read(self, key):
-        response = self.client.get_object(Bucket=self.bucket, Key=key)
+        response = self.client.get_object(
+            Bucket=self.bucket, Key=self._object_key(key)
+        )
         return response["Body"].get_raw_stream().read()
 
     def delete(self, key):
-        self.client.delete_object(Bucket=self.bucket, Key=key)
+        self.client.delete_object(
+            Bucket=self.bucket, Key=self._object_key(key)
+        )
 
     def probe(self):
         """Check bucket credentials without changing object data."""
@@ -124,14 +139,17 @@ class CosStorage:
         marker = ""
         while True:
             params = {"Bucket": self.bucket, "MaxKeys": 1000}
+            if self.prefix:
+                params["Prefix"] = f"{self.prefix}/"
             if marker:
                 params["Marker"] = marker
             response = self.client.list_objects(**params)
             contents = response.get("Contents") or []
             for item in contents:
                 key = item.get("Key")
-                if key:
-                    yield key
+                logical = self._logical_key(key) if key else None
+                if logical:
+                    yield logical
             if str(response.get("IsTruncated", "false")).lower() != "true":
                 break
             marker = response.get("NextMarker") or (
@@ -174,6 +192,9 @@ def get_storage(app):
                 "切换 COS 存储缺少配置: " + ", ".join(missing)
             )
 
-        return CosStorage(secret_id, secret_key, region, bucket)
+        prefix = app.config.get("COS_KEY_PREFIX") or os.environ.get(
+            "COS_KEY_PREFIX", ""
+        )
+        return CosStorage(secret_id, secret_key, region, bucket, prefix)
 
     return LocalStorage(app.config["UPLOAD_FOLDER"])

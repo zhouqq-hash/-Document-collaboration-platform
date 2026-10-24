@@ -44,12 +44,15 @@ def test_cos_storage_lists_all_pages_and_saves_bytes():
             self.calls.append(kwargs)
             if len(self.calls) == 1:
                 return {
-                    "Contents": [{"Key": "a.txt"}, {"Key": "b.txt"}],
+                    "Contents": [
+                        {"Key": "doc-collab/a.txt"},
+                        {"Key": "doc-collab/b.txt"},
+                    ],
                     "IsTruncated": "true",
-                    "NextMarker": "b.txt",
+                    "NextMarker": "doc-collab/b.txt",
                 }
             return {
-                "Contents": [{"Key": "c.txt"}],
+                "Contents": [{"Key": "doc-collab/c.txt"}],
                 "IsTruncated": "false",
             }
 
@@ -59,14 +62,16 @@ def test_cos_storage_lists_all_pages_and_saves_bytes():
     storage = object.__new__(CosStorage)
     storage.bucket = "bucket-1250000000"
     storage.region = "ap-hongkong"
+    storage.prefix = "doc-collab"
     storage.client = Client()
 
     assert list(storage.iter_keys()) == ["a.txt", "b.txt", "c.txt"]
+    assert storage.client.calls[0]["Prefix"] == "doc-collab/"
     storage.save_bytes(b"content", "a.txt")
     assert storage.client.saved == {
         "Bucket": "bucket-1250000000",
         "Body": b"content",
-        "Key": "a.txt",
+        "Key": "doc-collab/a.txt",
     }
 
 
