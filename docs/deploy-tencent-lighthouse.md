@@ -233,19 +233,21 @@ Cloud disk snapshot 与备份 ZIP 互补，不能只保留其中一种。
 - 预审记录会标记 AI 不可用；
 - 负责人可填写核验依据后人工兜底。
 
-需要 AI 时在 `.env` 增加：
+需要 AI 时不要手工把 Key 写进命令历史，运行：
+
+```bash
+cd ~/doc-collab
+bash scripts/configure-ai-key.sh
+```
+
+脚本隐藏输入 `COSMOS_API_KEY`，默认使用：
 
 ```text
-COSMOS_API_KEY=你的密钥
 COSMOS_API_BASE=https://api.siliconflow.cn/v1
 COSMOS_MODEL=deepseek-ai/DeepSeek-V4-Flash
 ```
 
-然后：
-
-```bash
-docker compose up -d
-```
+随后自动更新权限 600 的 `.env`、重启应用、等待就绪并执行严格自检。
 
 真实微信登录还需要应用 ID、密钥和已备案且配置正确的回调域名。模拟微信登录在这个
 Compose 配置中固定关闭。
