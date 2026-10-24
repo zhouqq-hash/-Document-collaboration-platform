@@ -11,6 +11,7 @@ fi
 
 docker compose run --rm app python - <<'PY'
 import os
+import json
 
 from qcloud_cos import CosConfig, CosS3Client
 
@@ -49,4 +50,16 @@ try:
     print(f"target_object_sample_count={len(result.get('Contents') or [])}")
 except Exception as exc:
     print(f"target_bucket_error={exc}")
+
+try:
+    location = client.get_bucket_location(Bucket=bucket)
+    print(f"bucket_location={json.dumps(location, ensure_ascii=False)}")
+except Exception as exc:
+    print(f"bucket_location_error={exc}")
+
+try:
+    acl = client.get_bucket_acl(Bucket=bucket)
+    print(f"bucket_acl={json.dumps(acl, ensure_ascii=False, default=str)}")
+except Exception as exc:
+    print(f"bucket_acl_error={exc}")
 PY
