@@ -13,20 +13,39 @@ if ! docker compose version >/dev/null 2>&1; then
   exit 1
 fi
 
+trim() {
+  local value="$1"
+  value="${value#"${value%%[![:space:]]*}"}"
+  value="${value%"${value##*[![:space:]]}"}"
+  printf '%s' "$value"
+}
+
 read -r -p "COS 存储桶名称（包含 APPID）: " cos_bucket
-read -r -p "COS 地域 [ap-hongkong]: " cos_region
-cos_region="${cos_region:-ap-hongkong}"
+read -r -p "COS 地域（例如 ap-guangzhou / ap-hongkong）: " cos_region
 read -r -p "COS 对象前缀 [doc-collab]: " cos_key_prefix
-cos_key_prefix="${cos_key_prefix:-doc-collab}"
+cos_bucket="$(trim "$cos_bucket")"
+cos_region="$(trim "$cos_region")"
+cos_key_prefix="$(trim "${cos_key_prefix:-doc-collab}")"
 read -r -s -p "COS SecretId: " cos_secret_id
 echo
 read -r -s -p "COS SecretKey: " cos_secret_key
 echo
+cos_secret_id="$(trim "$cos_secret_id")"
+cos_secret_key="$(trim "$cos_secret_key")"
+cos_key_prefix="${cos_key_prefix:-doc-collab}"
 
 if [ -z "$cos_bucket" ] || [ -z "$cos_secret_id" ] || [ -z "$cos_secret_key" ]; then
   echo "COS 存储桶、SecretId 和 SecretKey 不能为空。" >&2
   exit 1
 fi
+case "$cos_region" in
+  ap-[a-z0-9-]*)
+    ;;
+  *)
+    echo "COS 地域格式不正确，应类似 ap-guangzhou 或 ap-hongkong。" >&2
+    exit 1
+    ;;
+esac
 
 export COS_BUCKET="$cos_bucket"
 export COS_REGION="$cos_region"

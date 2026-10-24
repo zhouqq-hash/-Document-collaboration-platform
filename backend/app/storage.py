@@ -136,7 +136,14 @@ class CosStorage:
         params = {"Bucket": self.bucket, "MaxKeys": 1}
         if self.prefix:
             params["Prefix"] = f"{self.prefix}/"
-        self.client.list_objects(**params)
+        try:
+            self.client.list_objects(**params)
+        except Exception as exc:
+            raise StorageError(
+                "COS 访问失败："
+                f"bucket={self.bucket}, region={self.region}, "
+                f"prefix={self.prefix or '(root)'}: {exc}"
+            ) from exc
 
     def iter_keys(self):
         marker = ""
