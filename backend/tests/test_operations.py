@@ -5,8 +5,69 @@ from pathlib import Path
 
 from app import ai_review, create_app, db
 from app.models import Document, DocumentAiReview, DocumentVersion, User
-from app.operations import prune_backups, run_doctor
+from app.operations import (
+    create_backup,
+    inspect_backup,
+    migrate_local_storage,
+    prune_backups,
+    restore_backup,
+    run_doctor,
+)
 from conftest import build_test_config, create_document, login
+from app.storage import CosStorage
+
+
+class FakeCosStorage:
+    def __init__(self):
+        self.files = {}
+
+    def save_bytes(self, data, key):
+        self.files[key] = data
+
+    def read(self, key):
+        return self.files[key]
+
+    def iter_keys(self):
+        yield from sorted(self.files)
+
+    def probe(self):
+        return None
+
+
+def test_cos_storage_lists_all_pages_and_saves_bytes():
+    class Client:
+        def __init__(self):
+            self.calls = []
+            self.saved = None
+
+        def list_objects(self, **kwargs):
+            self.calls.append(kwargs)
+            if len(self.calls) == 1:
+                return {
+                    "Contents": [{"Key": "a.txt"}, {"Key": "b.txt"}],
+                    "IsTruncated": "true",
+                    "NextMarker": "b.txt",
+                }
+            return {
+                "Contents": [{"Key": "c.txt"}],
+                "IsTruncated": "false",
+            }
+
+        def put_object(self, **kwargs):
+            self.saved = kwargs
+
+    storage = object.__new__(CosStorage)
+    storage.bucket = "bucket-1250000000"
+    storage.region = "ap-hongkong"
+    storage.client = Client()
+
+    assert list(storage.iter_keys()) == ["a.txt", "b.txt", "c.txt"]
+    storage.save_bytes(b"content", "a.txt")
+    assert storage.client.saved == {
+        "Bucket": "bucket-1250000000",
+        "Body": b"content",
+        "Key": "a.txt",
+    }
 
 
 def test_readiness_reports_database_and_storage(client):
@@ -174,6 +235,52 @@ def test_backup_retention_only_removes_old_automatic_archives():
         assert automatic[2].exists()
         assert manual.exists()
         assert pre_restore.exists()
+
+
+def test_cos_backup_and_restore_include_object_data(app):
+    storage = FakeCosStorage()
+    storage.files["doc_1_v1_test.txt"] = b"COS object content"
+    app.config["STORAGE_BACKEND"] = "cos"
+    app.extensions["storage"] = storage
+    temp_root = Path(app.config["BACKUP_FOLDER"])
+
+    with app.app_context():
+        result = create_backup(app, temp_root / "cos-backup.zip")
+    assert result["media"] == {
+        "backend": "cos",
+        "included": True,
+        "file_count": 1,
+        "bytes": len(b"COS object content"),
+    }
+    inspected = inspect_backup(result["path"])
+    assert "media/doc_1_v1_test.txt" in inspected["members"]
+
+    storage.files.clear()
+    with app.app_context():
+        restore_backup(app, result["path"])
+    assert storage.files["doc_1_v1_test.txt"] == b"COS object content"
+
+
+def test_local_files_migrate_to_cos_and_are_verified(app, monkeypatch):
+    temp_root = Path(__file__).resolve().parents[1] / ".pytest_tmp"
+    temp_root.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(dir=temp_root) as temp:
+        source = Path(temp) / "media"
+        nested = source / "nested"
+        nested.mkdir(parents=True)
+        (nested / "document.txt").write_bytes(b"migrated content")
+        storage = FakeCosStorage()
+        monkeypatch.setattr("app.storage.CosStorage", FakeCosStorage)
+        app.config["STORAGE_BACKEND"] = "cos"
+        app.extensions["storage"] = storage
+
+        result = migrate_local_storage(app, source)
+
+        assert result == {
+            "file_count": 1,
+            "bytes": len(b"migrated content"),
+        }
+        assert storage.files["nested/document.txt"] == b"migrated content"
 
 
 def test_recover_reviews_turns_stale_work_into_manual_fallback(app, client):

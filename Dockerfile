@@ -14,7 +14,13 @@ RUN groupadd --gid 10001 doccollab \
 
 COPY backend/requirements-render.txt /app/backend/requirements-render.txt
 COPY backend/requirements.txt /app/backend/requirements.txt
-RUN python -m pip install -r /app/backend/requirements-render.txt
+COPY backend/requirements-cos.txt /app/backend/requirements-cos.txt
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends gcc libc6-dev \
+    && python -m pip install -r /app/backend/requirements-render.txt \
+    && python -m pip install -r /app/backend/requirements-cos.txt \
+    && apt-get purge -y --auto-remove gcc libc6-dev \
+    && rm -rf /var/lib/apt/lists/*
 
 COPY backend /app/backend
 COPY prototype /app/prototype

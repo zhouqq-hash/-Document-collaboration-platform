@@ -21,8 +21,28 @@ if [ ! -f .env ]; then
   if [ -z "$email" ]; then
     read -r -p "Let's Encrypt 通知邮箱: " email
   fi
+  cos_bucket="${COS_BUCKET:-}"
+  cos_region="${COS_REGION:-ap-hongkong}"
+  cos_secret_id="${COS_SECRET_ID:-}"
+  cos_secret_key="${COS_SECRET_KEY:-}"
+  if [ -z "$cos_bucket" ]; then
+    read -r -p "COS 私有桶名称（包含 APPID）: " cos_bucket
+  fi
+  if [ -z "$cos_secret_id" ]; then
+    read -r -s -p "COS SecretId: " cos_secret_id
+    echo
+  fi
+  if [ -z "$cos_secret_key" ]; then
+    read -r -s -p "COS SecretKey: " cos_secret_key
+    echo
+  fi
   if [ -z "$domain" ] || [ -z "$email" ]; then
     echo "APP_DOMAIN 和 ACME_EMAIL 不能为空。" >&2
+    exit 1
+  fi
+  if [ -z "$cos_bucket" ] || [ -z "$cos_secret_id" ] \
+    || [ -z "$cos_secret_key" ] || [ -z "$cos_region" ]; then
+    echo "COS 桶名称、地域和密钥不能为空。" >&2
     exit 1
   fi
 
@@ -37,6 +57,11 @@ if [ ! -f .env ]; then
     printf 'APP_DOMAIN=%s\n' "$domain"
     printf 'ACME_EMAIL=%s\n' "$email"
     printf 'SECRET_KEY=%s\n' "$secret"
+    printf 'STORAGE_BACKEND=cos\n'
+    printf 'COS_SECRET_ID=%s\n' "$cos_secret_id"
+    printf 'COS_SECRET_KEY=%s\n' "$cos_secret_key"
+    printf 'COS_REGION=%s\n' "$cos_region"
+    printf 'COS_BUCKET=%s\n' "$cos_bucket"
   } > .env
   echo "已生成 .env（权限 600）。"
 fi
@@ -49,6 +74,12 @@ set +a
 
 if [ -z "${APP_DOMAIN:-}" ] || [ -z "${ACME_EMAIL:-}" ]; then
   echo ".env 缺少 APP_DOMAIN 或 ACME_EMAIL。" >&2
+  exit 1
+fi
+if [ "${STORAGE_BACKEND:-cos}" = "cos" ] \
+  && { [ -z "${COS_SECRET_ID:-}" ] || [ -z "${COS_SECRET_KEY:-}" ] \
+    || [ -z "${COS_REGION:-}" ] || [ -z "${COS_BUCKET:-}" ]; }; then
+  echo ".env 缺少 COS 配置。现有服务器请运行 scripts/enable-tencent-cos.sh。" >&2
   exit 1
 fi
 if [ -z "${SECRET_KEY:-}" ] || [ "${#SECRET_KEY}" -lt 32 ]; then

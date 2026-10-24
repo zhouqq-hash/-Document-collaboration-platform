@@ -64,7 +64,19 @@ free -h
 
 4 GB 套餐通常不需要这一步。
 
-## 4. 拉取代码并部署
+## 4. 创建 COS 私有桶
+
+在腾讯云 COS 控制台创建：
+
+```text
+地域：中国香港（ap-hongkong）
+访问权限：私有读写
+```
+
+记下完整桶名，形如 `doc-collab-1250000000`。建议在 CAM 创建仅授权该桶的子用户
+API 密钥，不要使用主账号长期密钥。
+
+## 5. 拉取代码并部署
 
 ```bash
 cd ~
@@ -77,6 +89,7 @@ bash scripts/tencent-lighthouse-bootstrap.sh
 
 - 已解析到服务器的域名；
 - 证书通知邮箱；
+- COS 桶名、地域、SecretId 和 SecretKey；
 - 首个管理员的隐藏密码和二次确认。
 
 然后自动生成 `.env` 和随机 `SECRET_KEY`、构建镜像、启动应用、等待 `/api/ready`、
@@ -96,13 +109,26 @@ ALLOW_DOMAIN_MISMATCH=1 bash scripts/tencent-lighthouse-bootstrap.sh
 https://你的域名/
 ```
 
-## 5. 持久化结构
+### 已有本地存储切换到 COS
+
+如果网站已经按本地卷运行，不要重新初始化。创建 COS 桶和子用户密钥后执行：
+
+```bash
+cd ~/doc-collab
+git pull --ff-only
+bash scripts/enable-tencent-cos.sh
+```
+
+脚本会先备份本地数据，再构建 COS 镜像、停止 Web 服务、逐个迁移并校验本地附件，
+然后重启应用和 Caddy。
+
+## 6. 持久化结构
 
 Docker Compose 创建三个命名卷：
 
 | 卷 | 内容 |
 | --- | --- |
-| `app_data` | SQLite、上传附件、应用备份 |
+| `app_data` | SQLite、本地迁移源和备份 ZIP；新上传文件存 COS |
 | `caddy_data` | HTTPS 证书和私钥 |
 | `caddy_config` | Caddy 运行配置 |
 
@@ -117,7 +143,7 @@ docker volume inspect doc-collab_app_data
 
 不要执行 `docker compose down -v`，`-v` 会删除持久卷。
 
-## 6. 公网验收
+## 7. 公网验收
 
 在本地仓库运行两阶段验收：
 
@@ -150,7 +176,7 @@ docker compose restart
 - 普通教师修改/删除管理员表格均返回 403；
 - 最后清理验收表格。
 
-## 7. 创建老师账号
+## 8. 创建老师账号
 
 ```bash
 cd ~/doc-collab
@@ -160,7 +186,7 @@ docker compose exec app python -m flask --app backend/run.py \
 
 密码隐藏输入。不要创建 `teacher123` 等弱口令。
 
-## 8. 备份、恢复和云快照
+## 9. 备份、恢复和云快照
 
 手工备份并只保留最近 14 份自动备份：
 
@@ -196,7 +222,7 @@ Cloud disk snapshot 与备份 ZIP 互补，不能只保留其中一种。
 
 如果登录用户不是 `ubuntu`，同步修改路径。
 
-## 9. AI 与微信
+## 10. AI 与微信
 
 不配置 `COSMOS_API_KEY` 时：
 
@@ -221,7 +247,7 @@ docker compose up -d
 真实微信登录还需要应用 ID、密钥和已备案且配置正确的回调域名。模拟微信登录在这个
 Compose 配置中固定关闭。
 
-## 10. 更新、排障和回滚
+## 11. 更新、排障和回滚
 
 更新代码：
 
@@ -251,7 +277,7 @@ docker compose logs --tail=200 caddy
 - 需要代码回滚：使用 `git revert` 生成反向提交，再 `docker compose up -d --build`；
   不要使用覆盖云硬盘数据的方式回滚代码。
 
-## 11. 文件清单
+## 12. 文件清单
 
 | 文件 | 用途 |
 | --- | --- |

@@ -90,11 +90,23 @@ def _backup_database(app, target):
 
 def _backup_media(app, archive):
     backend = str(app.config.get("STORAGE_BACKEND") or "local").lower()
-    if backend != "local":
+    storage = app.extensions["storage"]
+    if backend == "cos":
+        count = 0
+        total_bytes = 0
+        for key in storage.iter_keys():
+            member = PurePosixPath(key)
+            if member.is_absolute() or ".." in member.parts:
+                raise ValueError(f"COS 对象 Key 不安全：{key}")
+            data = storage.read(key)
+            archive.writestr(f"media/{key}", data)
+            count += 1
+            total_bytes += len(data)
         return {
-            "backend": backend,
-            "included": False,
-            "warning": "对象存储文件未打包；请为 COS 开启版本控制并单独配置备份。",
+            "backend": "cos",
+            "included": True,
+            "file_count": count,
+            "bytes": total_bytes,
         }
 
     root = Path(app.config["UPLOAD_FOLDER"]).resolve()
@@ -272,16 +284,48 @@ def restore_backup(app, path):
         media_manifest = manifest.get("media") or {}
         if media_manifest.get("included"):
             media_source = temp_dir / "media"
-            media_target = Path(app.config["UPLOAD_FOLDER"]).resolve()
-            media_target.mkdir(parents=True, exist_ok=True)
             if media_source.exists():
-                shutil.copytree(
-                    media_source, media_target, dirs_exist_ok=True
-                )
+                backend = str(
+                    app.config.get("STORAGE_BACKEND") or "local"
+                ).lower()
+                if backend == "local":
+                    media_target = Path(app.config["UPLOAD_FOLDER"]).resolve()
+                    media_target.mkdir(parents=True, exist_ok=True)
+                    shutil.copytree(
+                        media_source, media_target, dirs_exist_ok=True
+                    )
+                else:
+                    storage = app.extensions["storage"]
+                    for source in sorted(media_source.rglob("*")):
+                        if not source.is_file():
+                            continue
+                        key = source.relative_to(media_source).as_posix()
+                        storage.save_bytes(source.read_bytes(), key)
 
     db.engine.dispose()
     db.session.remove()
     return inspected
+
+
+def migrate_local_storage(app, source):
+    """Copy local files into the configured COS bucket and verify each read."""
+    from .storage import CosStorage, LocalStorage
+
+    target = app.extensions["storage"]
+    if not isinstance(target, CosStorage):
+        raise ValueError("当前存储后端不是 COS，无法执行迁移")
+
+    local = LocalStorage(source)
+    count = 0
+    total_bytes = 0
+    for key in local.iter_keys():
+        data = local.read(key)
+        target.save_bytes(data, key)
+        if target.read(key) != data:
+            raise RuntimeError(f"COS 校验失败：{key}")
+        count += 1
+        total_bytes += len(data)
+    return {"file_count": count, "bytes": total_bytes}
 
 
 def _check_result(level, name, message):

@@ -11,6 +11,11 @@ services:
       DATABASE_URL: sqlite:////data/app/doc_collab.db
       UPLOAD_FOLDER: /data/app/media
       BACKUP_FOLDER: /data/app/backups
+      STORAGE_BACKEND: "${STORAGE_BACKEND:-cos}"
+      COS_SECRET_ID: "${COS_SECRET_ID:?Set COS_SECRET_ID in .env}"
+      COS_SECRET_KEY: "${COS_SECRET_KEY:?Set COS_SECRET_KEY in .env}"
+      COS_REGION: "${COS_REGION:-ap-hongkong}"
+      COS_BUCKET: "${COS_BUCKET:?Set COS_BUCKET in .env}"
       SESSION_COOKIE_SECURE: "1"
       WECHAT_MOCK_ENABLED: "0"
       SHOW_DEMO_CREDENTIALS: "0"

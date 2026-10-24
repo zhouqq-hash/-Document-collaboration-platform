@@ -643,12 +643,31 @@ def register_commands(app):
         print(f"备份完成：{result['path']}")
         print(f"数据库：{result['database']['kind']}")
         if result["media"].get("included"):
-            print(f"本地文件：{result['media'].get('file_count', 0)} 个")
+            print(
+                f"存储文件：{result['media'].get('file_count', 0)} 个"
+                f"（{result['media'].get('backend', 'unknown')}）"
+            )
         if result["media"].get("warning"):
             print(f"[提醒] {result['media']['warning']}")
         if keep is not None:
             removed = prune_backups(app.config["BACKUP_FOLDER"], keep)
             print(f"已清理旧自动备份：{removed} 份（保留 {keep} 份）。")
+
+    @app.cli.command("migrate-storage-cos")
+    @click.option(
+        "--source",
+        type=click.Path(file_okay=False, path_type=Path),
+        help="本地文件目录，默认使用 UPLOAD_FOLDER。",
+    )
+    def migrate_storage_cos(source):
+        """把本地附件复制到已配置的 COS 桶并逐个校验。"""
+        from .operations import migrate_local_storage
+
+        source = source or Path(app.config["UPLOAD_FOLDER"])
+        result = migrate_local_storage(app, source)
+        print(f"本地文件迁移完成：{result['file_count']} 个")
+        print(f"累计字节：{result['bytes']}")
+        print("本地文件仍保留，可在确认 COS 下载正常后再人工清理。")
 
     @app.cli.command("restore")
     @click.argument("path", type=click.Path(exists=True, dir_okay=False, path_type=Path))

@@ -29,9 +29,12 @@ class LocalStorage:
         return path
 
     def save(self, file_storage, key):
+        self.save_bytes(file_storage.read(), key)
+
+    def save_bytes(self, data, key):
         path = self._resolve(key)
         path.parent.mkdir(parents=True, exist_ok=True)
-        file_storage.save(str(path))
+        path.write_bytes(data)
 
     def copy(self, src_key, dst_key):
         src = self._resolve(src_key)
@@ -59,6 +62,12 @@ class LocalStorage:
         finally:
             path.unlink(missing_ok=True)
 
+    def iter_keys(self):
+        for path in sorted(self.root.rglob("*")):
+            if not path.is_file() or path.name.startswith(".readiness-"):
+                continue
+            yield path.relative_to(self.root).as_posix()
+
 
 class CosStorage:
     """把文件保存到腾讯云 COS 对象存储。"""
@@ -80,9 +89,12 @@ class CosStorage:
         self.region = region
 
     def save(self, file_storage, key):
+        self.save_bytes(file_storage.read(), key)
+
+    def save_bytes(self, data, key):
         self.client.put_object(
             Bucket=self.bucket,
-            Body=file_storage.read(),
+            Body=data,
             Key=key,
         )
 
@@ -107,6 +119,26 @@ class CosStorage:
     def probe(self):
         """Check bucket credentials without changing object data."""
         self.client.head_bucket(Bucket=self.bucket)
+
+    def iter_keys(self):
+        marker = ""
+        while True:
+            params = {"Bucket": self.bucket, "MaxKeys": 1000}
+            if marker:
+                params["Marker"] = marker
+            response = self.client.list_objects(**params)
+            contents = response.get("Contents") or []
+            for item in contents:
+                key = item.get("Key")
+                if key:
+                    yield key
+            if str(response.get("IsTruncated", "false")).lower() != "true":
+                break
+            marker = response.get("NextMarker") or (
+                contents[-1].get("Key") if contents else ""
+            )
+            if not marker:
+                break
 
 
 def get_storage(app):
